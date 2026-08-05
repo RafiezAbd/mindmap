@@ -12,10 +12,11 @@
 // ============================================================
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME"
+  apiKey: "AIzaSyD6I8Y3wQLf_luGzUqEQTTnKiewGVY6Ghs",
+  authDomain: "mindmapdash.firebaseapp.com",
+  projectId: "mindmapdash",
+  storageBucket: "mindmapdash.firebasestorage.app",
+  messagingSenderId: "844299940735",
+  appId: "1:844299940735:web:fdf45c21be31e38fb8204a",
+  measurementId: "G-NKFZ5P35XT"
 };
