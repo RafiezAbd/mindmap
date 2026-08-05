@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Maps live at /maps/{mapId}. Only the owner or a listed
+    // collaborator can read or write one — EXCEPT that anyone
+    // signed in may append their OWN uid to `collaborators`,
+    // which is how joining with an invite code works.
+    match /maps/{mapId} {
+      allow read: if request.auth != null &&
+        (resource.data.ownerId == request.auth.uid ||
+         request.auth.uid in resource.data.collaborators);
+
+      allow create: if request.auth != null &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      allow update: if request.auth != null && (
+        resource.data.ownerId == request.auth.uid ||
+        request.auth.uid in resource.data.collaborators ||
+        // joining via invite code: the ONLY change allowed is
+        // appending your own uid to collaborators
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['collaborators']) &&
+         request.resource.data.collaborators.hasAll(resource.data.collaborators) &&
+         request.resource.data.collaborators.hasAll([request.auth.uid]) &&
+         request.resource.data.collaborators.size() == resource.data.collaborators.size() + 1)
+      );
+
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Invite codes are tiny pointer docs: { mapId, ownerId }.
+    // Reading one requires already knowing the code (this is a
+    // "get" of one exact document, not a listable query), which
+    // is how the join flow looks up which map a code belongs to.
+    match /joinCodes/{code} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // Everything else is denied by default.
+  }
+}
