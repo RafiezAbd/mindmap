@@ -33,6 +33,12 @@ README.md            this file
 - **Email/Password** — turn it on and save.
 - **Google** — turn it on, pick a support email, and save.
 
+Google sign-in uses a full-page redirect to Google and back (not a popup) —
+this avoids a known issue where Chrome's default cross-origin policy makes
+Firebase's popup flow fail with a flash-and-close on static hosts like
+GitHub Pages. You'll see the page briefly navigate away and return; that's
+expected.
+
 ## 3. Turn on Firestore and lock it down
 
 1. **Build → Firestore Database → Create database** (production mode, any
