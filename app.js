@@ -9,7 +9,7 @@ import { firebaseConfig } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
@@ -101,12 +101,19 @@ $('#btn-google').addEventListener('click', async () => {
   const errEl = $('#auth-error');
   errEl.hidden = true;
   try {
-    await signInWithPopup(auth, googleProvider);
+    await signInWithRedirect(auth, googleProvider);
+    // Page navigates away to Google here; execution resumes via
+    // getRedirectResult() below once the user comes back.
   } catch (err) {
-    if (err.code === 'auth/popup-closed-by-user') return;
     errEl.textContent = friendlyAuthError(err);
     errEl.hidden = false;
   }
+});
+
+// Picks up the result after the browser returns from Google's sign-in page.
+getRedirectResult(auth).catch((err) => {
+  $('#auth-error').textContent = friendlyAuthError(err);
+  $('#auth-error').hidden = false;
 });
 
 function friendlyAuthError(err) {
