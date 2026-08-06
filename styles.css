@@ -420,6 +420,15 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   font-size: 13px; box-shadow: var(--shadow-card); z-index: 200;
 }
 
+/* ============ Version badge ============ */
+.app-version {
+  position: fixed; left: 10px; bottom: 8px;
+  font-size: 10.5px; color: var(--text-lo);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 5;
+}
+
 /* ============ Scrollbars (dashboard) ============ */
 .view-dashboard::-webkit-scrollbar { width: 10px; }
 .view-dashboard::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
