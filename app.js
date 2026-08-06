@@ -465,10 +465,10 @@ function colorForNode(node) {
   if (node.depth === 0) return { bg: 'var(--paper)', text: '#1c1c1c', stroke: 'var(--paper-dim)' };
   const { hue, sourceDepth } = resolveColorSource(node);
   const rel = Math.max(0, node.depth - sourceDepth);
-  // the anchor node itself (rel 0) stays vivid; each level below it
-  // gets progressively lighter and a touch less saturated
-  const sat = Math.max(45, 72 - rel * 6);
-  const light = Math.min(78, 46 + rel * 8);
+  // the anchor node itself (rel 0) stays vivid and fairly dark; each
+  // level below it steps noticeably lighter and less saturated
+  const sat = Math.max(30, 78 - rel * 10);
+  const light = Math.min(85, 42 + rel * 12);
   const bg = `hsl(${hue} ${sat}% ${light}%)`;
   const text = light > 58 ? '#1c1c1c' : '#fbfaf7';
   const stroke = `hsl(${hue} ${sat}% ${Math.max(20, light - 18)}%)`;
