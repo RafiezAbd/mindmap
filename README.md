@@ -119,6 +119,9 @@ Fully static, so GitHub Pages needs nothing else configured.
 - **Drag** a node to reposition it by hand.
 - **Drag empty canvas** to pan, **scroll** to zoom, or use the zoom buttons.
 - The small circle on a node with children **collapses/expands** that branch.
+- **Hover a node** to see who added it (and who last edited its text, if
+  different), with a relative timestamp. The same info shows as a caption
+  above the toolbar when a node is selected.
 - **Export** downloads the current map as `.json`.
 
 **Sharing a map**
@@ -139,8 +142,14 @@ Each branch off the central idea gets its own hue, derived from that
 branch's own id — not a shared counter — so two people adding branches at
 the same moment never end up with colliding colors. Every node further down
 that branch keeps the same hue but gets a bit darker/less saturated with
-each level: color says *which topic*, shade says *how deep*. Reshuffle an
-individual branch's color from its toolbar if you want a different hue.
+each level: color says *which topic*, shade says *how deep*.
+
+**Any node (except the center) can become its own color anchor** — select
+it and click the swatch in its toolbar to give it (and everything under it)
+a fresh random hue, cascading lighter with each level below it, same as a
+top-level branch does by default. Click again to reshuffle, or right-click
+the swatch to reset that node back to whatever color it would have
+inherited normally.
 
 ## How real-time sync works
 
@@ -167,7 +176,10 @@ never gets overwritten mid-action.
   "rootId": "root",
   "nodes": {
     "root": { "text": "Central idea", "parentId": null, "x": 0, "y": 0, "depth": 0 },
-    "abc123": { "text": "Branch one", "parentId": "root", "x": 230, "y": 0, "depth": 1, "side": "right", "branch": "abc123" }
+    "abc123": {
+      "text": "Branch one", "parentId": "root", "x": 230, "y": 0, "depth": 1, "side": "right", "branch": "abc123",
+      "createdBy": "uid_of_whoever_added_it", "createdByName": "Alex", "createdAt": 1735689600000
+    }
   }
 }
 

@@ -443,16 +443,30 @@ function mergeRemoteIntoLocal(remote) {
 }
 
 // ------------------------------------------------------------
-// Color system: hue per branch (a branch's own id, hashed), with
-// lightness/saturation shifting per depth — color encodes topic,
-// shade encodes level. Hashing off the id (not a shared counter)
-// means two collaborators can't collide when adding branches at once.
+// Color system: hue per branch, with lightness/saturation shifting
+// per depth — color encodes topic, shade encodes level. Any node can
+// become a "color anchor" by setting its own hueOverride; its whole
+// subtree then shades off that hue instead of the branch default,
+// which is found by walking up to the nearest ancestor (or self)
+// that has an override, falling back to the branch's hashed hue.
 // ------------------------------------------------------------
+function resolveColorSource(node) {
+  let cur = node;
+  while (cur) {
+    if (cur.hueOverride !== undefined && cur.hueOverride !== null) {
+      return { hue: cur.hueOverride, sourceDepth: cur.depth };
+    }
+    cur = cur.parentId ? mapData.nodes[cur.parentId] : null;
+  }
+  return { hue: hashHue(node.branch || 'x'), sourceDepth: 1 };
+}
+
 function colorForNode(node) {
   if (node.depth === 0) return { bg: 'var(--paper)', text: '#1c1c1c', stroke: 'var(--paper-dim)' };
-  const hue = node.hueOverride !== undefined && node.hueOverride !== null ? node.hueOverride : hashHue(node.branch || 'x');
-  const sat = Math.max(40, 78 - (node.depth - 1) * 6);
-  const light = Math.max(32, 58 - (node.depth - 1) * 6);
+  const { hue, sourceDepth } = resolveColorSource(node);
+  const rel = Math.max(0, node.depth - sourceDepth);
+  const sat = Math.max(40, 78 - rel * 6);
+  const light = Math.max(32, 58 - rel * 6);
   const bg = `hsl(${hue} ${sat}% ${light}%)`;
   const text = light > 58 ? '#1c1c1c' : '#fbfaf7';
   const stroke = `hsl(${hue} ${sat}% ${Math.max(20, light - 18)}%)`;
@@ -787,13 +801,23 @@ function renderNodeActions() {
     row.appendChild(delBtn);
   }
 
-  if (n.depth === 1) {
+  if (n.depth >= 1) {
     const swBtn = document.createElement('button');
     swBtn.innerHTML = '<span class="swatch" style="background:' + colorForNode(n).bg + '"></span>';
-    swBtn.title = 'Shuffle branch color';
+    swBtn.title = n.hueOverride !== undefined && n.hueOverride !== null
+      ? 'Click to reshuffle this branch\'s color · Right-click to reset to inherited'
+      : 'Click to give this branch its own color';
     swBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       n.hueOverride = Math.round(Math.random() * 360);
+      queueNodeWrite(selectedId);
+      renderAll();
+    });
+    swBtn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (n.hueOverride === undefined || n.hueOverride === null) return;
+      delete n.hueOverride;
       queueNodeWrite(selectedId);
       renderAll();
     });
