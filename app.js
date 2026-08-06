@@ -159,10 +159,22 @@ onAuthStateChanged(auth, (user) => {
     $('#dash-email').textContent = user.email || user.displayName || 'Signed in';
     showView('dashboard');
     loadDashboard();
+    openJoinModalFromLink();
   } else {
     showView('auth');
   }
 });
+
+// If the user arrived via an invite link (…?code=XXXX), open the join
+// modal pre-filled with that code instead of making them type it in.
+function openJoinModalFromLink() {
+  const code = new URLSearchParams(location.search).get('code');
+  if (!code) return;
+  history.replaceState(null, '', location.pathname);
+  $('#join-code-input').value = code.trim().toUpperCase();
+  $('#join-error').hidden = true;
+  $('#join-modal').hidden = false;
+}
 
 // ============================================================
 // DASHBOARD
@@ -1014,6 +1026,19 @@ $('#share-copy').addEventListener('click', async () => {
     toast('Code copied');
   } catch (_) {
     toast(mapData.shareCode || '');
+  }
+});
+
+$('#share-copy-message').addEventListener('click', async () => {
+  const code = mapData.shareCode || '';
+  const link = `${location.origin}${location.pathname}?code=${code}`;
+  const title = mapData.title || 'Untitled map';
+  const message = `Join my mind map "${title}" on Mindmap: ${link}\nInvite code: ${code}`;
+  try {
+    await navigator.clipboard.writeText(message);
+    toast('Invite message copied');
+  } catch (_) {
+    toast(message);
   }
 });
 
