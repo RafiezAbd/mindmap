@@ -140,9 +140,9 @@ Fully static, so GitHub Pages needs nothing else configured.
 
 Each branch off the central idea gets its own hue, derived from that
 branch's own id — not a shared counter — so two people adding branches at
-the same moment never end up with colliding colors. Every node further down
-that branch keeps the same hue but gets a bit darker/less saturated with
-each level: color says *which topic*, shade says *how deep*.
+the same moment never end up with colliding colors. That branch-root node
+stays the most vivid, and every node further down gets progressively
+lighter with each level: color says *which topic*, shade says *how deep*.
 
 **Any node (except the center) can become its own color anchor** — select
 it and click the swatch in its toolbar to give it (and everything under it)
