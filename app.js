@@ -243,6 +243,25 @@ function relativeTime(date) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+// Full multi-line text for a node's native hover tooltip.
+function attributionTooltip(n) {
+  if (!n.createdBy) return '';
+  let lines = [`Added by ${n.createdByName || 'someone'} · ${relativeTime(new Date(n.createdAt))}`];
+  if (n.updatedBy && n.updatedAt && n.updatedAt !== n.createdAt) {
+    lines.push(`Edited by ${n.updatedByName || 'someone'} · ${relativeTime(new Date(n.updatedAt))}`);
+  }
+  return lines.join('\n');
+}
+
+// Short single line for the node toolbar — most recent event wins.
+function attributionCaption(n) {
+  if (!n.createdBy) return null;
+  if (n.updatedBy && n.updatedAt && n.updatedAt !== n.createdAt) {
+    return `Edited by ${n.updatedByName || 'someone'} · ${relativeTime(new Date(n.updatedAt))}`;
+  }
+  return `Added by ${n.createdByName || 'someone'} · ${relativeTime(new Date(n.createdAt))}`;
+}
+
 $('#btn-new-map').addEventListener('click', async () => {
   const rootId = 'root';
   const newDoc = {
@@ -255,7 +274,10 @@ $('#btn-new-map').addEventListener('click', async () => {
     updatedAt: serverTimestamp(),
     rootId,
     nodes: {
-      [rootId]: { text: 'Central idea', parentId: null, x: 0, y: 0, depth: 0, side: null, branch: null, collapsed: false }
+      [rootId]: {
+        text: 'Central idea', parentId: null, x: 0, y: 0, depth: 0, side: null, branch: null, collapsed: false,
+        createdBy: currentUser.uid, createdByName: currentUser.displayName || currentUser.email || 'Someone', createdAt: Date.now()
+      }
     }
   };
   const ref = await addDoc(mapsCollection(), newDoc);
@@ -479,7 +501,10 @@ function addChildNode(parentId, text = 'New idea') {
     text, parentId, depth: parent.depth + 1, side, branch,
     x: parent.x + (side === 'left' ? -NODE_SPACING_X : NODE_SPACING_X),
     y: parent.y + siblingCount * SIB_SPACING_Y,
-    collapsed: false, order: siblingCount
+    collapsed: false, order: siblingCount,
+    createdBy: currentUser.uid,
+    createdByName: currentUser.displayName || currentUser.email || 'Someone',
+    createdAt: Date.now()
   };
   queueNodeWrite(id);
   relayoutChildren(parentId);
@@ -569,6 +594,8 @@ function makeNodeEl(id) {
   el.style.borderColor = c.stroke;
   el.textContent = n.text;
   el.dataset.id = id;
+  const attrTip = attributionTooltip(n);
+  if (attrTip) el.title = attrTip;
   if (id === editingId) el.contentEditable = 'true';
 
   const kids = childrenOf(id);
@@ -696,7 +723,13 @@ function commitEditing(el) {
   const id = el.dataset.id;
   const n = mapData.nodes[id];
   const text = el.textContent.trim() || 'Untitled';
-  if (n.text !== text) { n.text = text; queueNodeWrite(id); }
+  if (n.text !== text) {
+    n.text = text;
+    n.updatedBy = currentUser.uid;
+    n.updatedByName = currentUser.displayName || currentUser.email || 'Someone';
+    n.updatedAt = Date.now();
+    queueNodeWrite(id);
+  }
   editingId = null;
   el.contentEditable = 'false';
   renderNodeActions();
@@ -716,6 +749,18 @@ function renderNodeActions() {
   actionsEl.style.top = (n.y - (n.depth === 0 ? 46 : 40)) + 'px';
   actionsEl.style.transform = 'translate(-50%, -100%)';
 
+  const caption = attributionCaption(n);
+  if (caption) {
+    const cap = document.createElement('div');
+    cap.className = 'node-actions-caption';
+    cap.textContent = caption;
+    actionsEl.appendChild(cap);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'node-actions-row';
+  actionsEl.appendChild(row);
+
   const addBtn = document.createElement('button');
   addBtn.textContent = '+';
   addBtn.title = 'Add child idea (Tab)';
@@ -726,20 +771,20 @@ function renderNodeActions() {
     selectNode(newId);
     startEditing(newId);
   });
-  actionsEl.appendChild(addBtn);
+  row.appendChild(addBtn);
 
   const renameBtn = document.createElement('button');
   renameBtn.textContent = '✎';
   renameBtn.title = 'Rename';
   renameBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditing(selectedId); });
-  actionsEl.appendChild(renameBtn);
+  row.appendChild(renameBtn);
 
   if (n.depth > 0) {
     const delBtn = document.createElement('button');
     delBtn.textContent = '🗑';
     delBtn.title = 'Delete branch (Del)';
     delBtn.addEventListener('click', (e) => { e.stopPropagation(); handleDeleteSelected(); });
-    actionsEl.appendChild(delBtn);
+    row.appendChild(delBtn);
   }
 
   if (n.depth === 1) {
@@ -752,7 +797,7 @@ function renderNodeActions() {
       queueNodeWrite(selectedId);
       renderAll();
     });
-    actionsEl.appendChild(swBtn);
+    row.appendChild(swBtn);
   }
 
   nodeLayer.appendChild(actionsEl);
