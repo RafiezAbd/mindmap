@@ -292,6 +292,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   background-image: radial-gradient(var(--canvas-dot) 1.4px, transparent 1.4px);
   background-size: 26px 26px;
   cursor: grab;
+  touch-action: none;
 }
 .canvas-wrap.is-panning { cursor: grabbing; }
 .canvas-world {
@@ -339,6 +340,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   text-align: center;
   cursor: grab;
   user-select: none;
+  touch-action: none;
   box-shadow: 0 3px 0 rgba(0,0,0,0.18), 0 6px 16px rgba(0,0,0,0.25);
   border: 2px solid transparent;
   line-height: 1.3;

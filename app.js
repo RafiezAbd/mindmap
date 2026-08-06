@@ -883,36 +883,91 @@ function handleDeleteSelected() {
 // ------------------------------------------------------------
 let panning = false, panStartX, panStartY, panOrigX, panOrigY;
 
-canvasWrap.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('.node') || e.target.closest('.node-actions')) return;
-  panning = true;
-  canvasWrap.classList.add('is-panning');
-  panStartX = e.clientX; panStartY = e.clientY;
-  panOrigX = view.panX; panOrigY = view.panY;
-  selectedId = null;
-  renderNodeActions();
-  refreshNodeSelectionClasses();
-});
-window.addEventListener('pointermove', (e) => {
-  if (!panning) return;
-  view.panX = panOrigX + (e.clientX - panStartX);
-  view.panY = panOrigY + (e.clientY - panStartY);
-  applyViewTransform();
-});
-window.addEventListener('pointerup', () => { panning = false; canvasWrap.classList.remove('is-panning'); });
-
-canvasWrap.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  const rect = canvasWrap.getBoundingClientRect();
-  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+// Zoom the view so that the given point (in canvasWrap-local pixels)
+// stays under the cursor/fingers as the scale changes.
+function zoomAroundPoint(mx, my, newScale) {
+  newScale = Math.min(2.2, Math.max(0.25, newScale));
   const worldX = (mx - view.panX) / view.scale;
   const worldY = (my - view.panY) / view.scale;
-  const delta = -e.deltaY * 0.0015;
-  const newScale = Math.min(2.2, Math.max(0.25, view.scale * (1 + delta)));
   view.panX = mx - worldX * newScale;
   view.panY = my - worldY * newScale;
   view.scale = newScale;
   applyViewTransform();
+}
+
+// Pointers currently down on the canvas background (not on a node),
+// keyed by pointerId, used for both single-finger panning and
+// two-finger pinch-to-zoom on touch devices.
+const canvasPointers = new Map();
+let pinchStartDist = null, pinchStartScale = null;
+
+function pinchMidpoint() {
+  const pts = [...canvasPointers.values()];
+  const rect = canvasWrap.getBoundingClientRect();
+  return {
+    x: (pts[0].x + pts[1].x) / 2 - rect.left,
+    y: (pts[0].y + pts[1].y) / 2 - rect.top,
+  };
+}
+function pinchDist() {
+  const pts = [...canvasPointers.values()];
+  return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+}
+
+canvasWrap.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.node') || e.target.closest('.node-actions')) return;
+  canvasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (canvasPointers.size === 2) {
+    panning = false;
+    canvasWrap.classList.remove('is-panning');
+    pinchStartDist = pinchDist();
+    pinchStartScale = view.scale;
+  } else if (canvasPointers.size === 1) {
+    panning = true;
+    canvasWrap.classList.add('is-panning');
+    panStartX = e.clientX; panStartY = e.clientY;
+    panOrigX = view.panX; panOrigY = view.panY;
+    selectedId = null;
+    renderNodeActions();
+    refreshNodeSelectionClasses();
+  }
+});
+window.addEventListener('pointermove', (e) => {
+  if (!canvasPointers.has(e.pointerId)) return;
+  canvasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (canvasPointers.size === 2 && pinchStartDist) {
+    const { x, y } = pinchMidpoint();
+    const newScale = pinchStartScale * (pinchDist() / pinchStartDist);
+    zoomAroundPoint(x, y, newScale);
+  } else if (canvasPointers.size === 1 && panning) {
+    view.panX = panOrigX + (e.clientX - panStartX);
+    view.panY = panOrigY + (e.clientY - panStartY);
+    applyViewTransform();
+  }
+});
+function releaseCanvasPointer(e) {
+  canvasPointers.delete(e.pointerId);
+  pinchStartDist = null;
+  panning = false;
+  canvasWrap.classList.remove('is-panning');
+  // If one finger remains after a pinch, resume panning from it
+  // instead of jumping back to a stale single-pointer start.
+  if (canvasPointers.size === 1) {
+    const pt = [...canvasPointers.values()][0];
+    panning = true;
+    canvasWrap.classList.add('is-panning');
+    panStartX = pt.x; panStartY = pt.y;
+    panOrigX = view.panX; panOrigY = view.panY;
+  }
+}
+window.addEventListener('pointerup', releaseCanvasPointer);
+window.addEventListener('pointercancel', releaseCanvasPointer);
+
+canvasWrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = canvasWrap.getBoundingClientRect();
+  const delta = -e.deltaY * 0.0015;
+  zoomAroundPoint(e.clientX - rect.left, e.clientY - rect.top, view.scale * (1 + delta));
 }, { passive: false });
 
 $('#btn-zoom-in').addEventListener('click', () => zoomBy(1.2));
@@ -920,13 +975,7 @@ $('#btn-zoom-out').addEventListener('click', () => zoomBy(1 / 1.2));
 $('#btn-zoom-reset').addEventListener('click', centerView);
 function zoomBy(factor) {
   const rect = canvasWrap.getBoundingClientRect();
-  const mx = rect.width / 2, my = rect.height / 2;
-  const worldX = (mx - view.panX) / view.scale;
-  const worldY = (my - view.panY) / view.scale;
-  view.scale = Math.min(2.2, Math.max(0.25, view.scale * factor));
-  view.panX = mx - worldX * view.scale;
-  view.panY = my - worldY * view.scale;
-  applyViewTransform();
+  zoomAroundPoint(rect.width / 2, rect.height / 2, view.scale * factor);
 }
 
 // ------------------------------------------------------------
