@@ -400,6 +400,15 @@ function stopMapListener() {
   unsubscribeMap = null;
 }
 
+function nodesEqual(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const ak = Object.keys(a), bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  for (const k of ak) if (a[k] !== b[k]) return false;
+  return true;
+}
+
 function mergeRemoteIntoLocal(remote) {
   if (!mapData) return;
   let needsRender = false;
@@ -426,7 +435,7 @@ function mergeRemoteIntoLocal(remote) {
     if (id === editingId || id === draggingId) continue;      // actively being touched locally
     const incoming = remoteNodes[id];
     const local = mapData.nodes[id];
-    if (!local || JSON.stringify(local) !== JSON.stringify(incoming)) {
+    if (!local || !nodesEqual(local, incoming)) {
       mapData.nodes[id] = incoming;
       needsRender = true;
     }
@@ -439,7 +448,13 @@ function mergeRemoteIntoLocal(remote) {
     }
   }
 
-  if (needsRender) renderAll();
+  // Never rebuild the DOM while someone's mid-keystroke or mid-drag —
+  // renderAll() tears down and recreates every node element, which would
+  // yank focus out of a contentEditable node (losing whatever they just
+  // typed) or reset a node being dragged. Whatever changed remotely is
+  // already sitting in mapData and will show up on the next render once
+  // the local edit/drag finishes.
+  if (needsRender && !editingId && !draggingId) renderAll();
 }
 
 // ------------------------------------------------------------
@@ -578,19 +593,18 @@ function renderAll() {
   ids.forEach(id => {
     const n = mapData.nodes[id];
     if (!n.parentId || !ids.includes(n.parentId)) return;
-    edgeLayer.appendChild(makeEdgePath(mapData.nodes[n.parentId], n));
+    edgeLayer.appendChild(makeEdgePath(mapData.nodes[n.parentId], n, id));
   });
   ids.forEach(id => nodeLayer.appendChild(makeNodeEl(id)));
   applyViewTransform();
   renderNodeActions();
 }
 
-function makeEdgePath(p, n) {
+function makeEdgePath(p, n, childId) {
   const ns = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  const dx = (n.x - p.x) * 0.5;
-  const d = `M ${p.x} ${p.y} C ${p.x + dx} ${p.y}, ${n.x - dx} ${n.y}, ${n.x} ${n.y}`;
-  ns.setAttribute('d', d);
+  ns.setAttribute('d', edgeD(p, n));
   ns.setAttribute('class', 'edge-path');
+  if (childId) ns.dataset.child = childId;
   const color = colorForNode(n);
   ns.setAttribute('stroke', color.bg);
   ns.setAttribute('stroke-width', Math.max(2, 6 - (n.depth - 1) * 1.1));
@@ -668,7 +682,7 @@ function attachNodeInteractions(el, id) {
     el.classList.add('is-dragging');
     el.style.left = n.x + 'px';
     el.style.top = n.y + 'px';
-    updateEdgesFor();
+    updateEdgesForDrag(id);
   });
 
   el.addEventListener('pointerup', () => {
@@ -691,16 +705,12 @@ function attachNodeInteractions(el, id) {
       const n = mapData.nodes[id];
       if (n.parentId) {
         const newId = addChildNode(n.parentId, '');
-        renderAll();
-        selectNode(newId);
         startEditing(newId);
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
       commitEditing(el);
       const newId = addChildNode(id, '');
-      renderAll();
-      selectNode(newId);
       startEditing(newId);
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -709,14 +719,26 @@ function attachNodeInteractions(el, id) {
   });
 }
 
-function updateEdgesFor() {
-  edgeLayer.innerHTML = '';
-  const ids = visibleNodeIds();
-  ids.forEach(nid => {
-    const n = mapData.nodes[nid];
-    if (!n.parentId || !ids.includes(n.parentId)) return;
-    edgeLayer.appendChild(makeEdgePath(mapData.nodes[n.parentId], n));
+function updateEdgesForDrag(id) {
+  // Only the edge into this node, and the edges out to each of its
+  // children, actually move when this node is dragged — touch just those
+  // instead of tearing down and rebuilding every edge in the map on
+  // every single pointermove (that full rebuild was the main cause of
+  // dragging feeling sluggish on anything but tiny maps).
+  const n = mapData.nodes[id];
+  if (n.parentId && mapData.nodes[n.parentId]) {
+    const ownEdge = edgeLayer.querySelector(`[data-child="${id}"]`);
+    if (ownEdge) ownEdge.setAttribute('d', edgeD(mapData.nodes[n.parentId], n));
+  }
+  childrenOf(id).forEach(kidId => {
+    const kidEdge = edgeLayer.querySelector(`[data-child="${kidId}"]`);
+    if (kidEdge) kidEdge.setAttribute('d', edgeD(n, mapData.nodes[kidId]));
   });
+}
+
+function edgeD(p, n) {
+  const dx = (n.x - p.x) * 0.5;
+  return `M ${p.x} ${p.y} C ${p.x + dx} ${p.y}, ${n.x - dx} ${n.y}, ${n.x} ${n.y}`;
 }
 
 function selectNode(id) { selectedId = id; refreshNodeSelectionClasses(); }
@@ -729,9 +751,15 @@ function startEditing(id) {
   editingId = id;
   selectedId = id;
   renderAll();
+  // Double-RAF: wait a full extra frame past the render so the browser
+  // has definitely painted the new contentEditable node before we try
+  // to focus it — a single RAF was occasionally landing before layout
+  // settled, which made a fresh node silently fail to pick up focus.
   requestAnimationFrame(() => {
-    const el = nodeLayer.querySelector(`[data-id="${id}"]`);
-    if (el) { el.focus(); document.getSelection().selectAllChildren(el); }
+    requestAnimationFrame(() => {
+      const el = nodeLayer.querySelector(`[data-id="${id}"]`);
+      if (el) { el.focus(); document.getSelection().selectAllChildren(el); }
+    });
   });
 }
 
@@ -783,8 +811,6 @@ function renderNodeActions() {
   addBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const newId = addChildNode(selectedId, '');
-    renderAll();
-    selectNode(newId);
     startEditing(newId);
   });
   row.appendChild(addBtn);
@@ -905,8 +931,6 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Tab' && selectedId) {
     e.preventDefault();
     const newId = addChildNode(selectedId, '');
-    renderAll();
-    selectNode(newId);
     startEditing(newId);
   } else if (e.key === 'Enter' && selectedId) {
     e.preventDefault();
