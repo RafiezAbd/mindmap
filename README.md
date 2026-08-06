@@ -33,11 +33,34 @@ README.md            this file
 - **Email/Password** — turn it on and save.
 - **Google** — turn it on, pick a support email, and save.
 
-Google sign-in uses a full-page redirect to Google and back (not a popup) —
-this avoids a known issue where Chrome's default cross-origin policy makes
-Firebase's popup flow fail with a flash-and-close on static hosts like
-GitHub Pages. You'll see the page briefly navigate away and return; that's
-expected.
+Google sign-in itself is handled by **Google Identity Services** (Google's
+own "Sign in with Google" library) rather than Firebase's built-in
+popup/redirect flow. Firebase's own flow depends on a cross-site storage
+handshake that Chrome (and other browsers) increasingly block by default —
+on static hosts like GitHub Pages this often shows up as the sign-in popup
+flashing and closing instantly, or a redirect that silently goes nowhere.
+Google's library uses Chrome's newer FedCM mechanism instead, which is
+built to keep working under those restrictions.
+
+This needs one extra value — a Google OAuth **Client ID** (different from
+the `apiKey` in your Firebase config):
+
+1. Go to https://console.cloud.google.com/apis/credentials and make sure
+   the project selector (top bar) is set to the **same project** as your
+   Firebase project.
+2. Under **OAuth 2.0 Client IDs**, you should already see one named
+   **"Web client (auto created by Google Service)"** — Firebase created
+   this automatically when you enabled Google sign-in. Click it.
+3. Copy its **Client ID** (looks like
+   `123456789-abc123xyz.apps.googleusercontent.com`) into
+   `firebase-config.js` as `googleClientId`.
+4. On that same page, under **Authorized JavaScript origins**, click
+   **Add URI** and add your site's exact origin with no trailing slash or
+   path — e.g. `https://yourname.github.io` (for local testing, also add
+   `http://localhost:8080` or whatever port you use). Save.
+
+Without step 4, Google's button will render but sign-in attempts will fail
+with an origin error in the browser console.
 
 ## 3. Turn on Firestore and lock it down
 

@@ -5,11 +5,11 @@
 // Vanilla JS, no build step.
 // ============================================================
 
-import { firebaseConfig } from './firebase-config.js';
+import { firebaseConfig, googleClientId } from './firebase-config.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
+  GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
@@ -19,7 +19,6 @@ import {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
 
 // ------------------------------------------------------------
 // Small helpers
@@ -97,23 +96,41 @@ $('#auth-form').addEventListener('submit', async (e) => {
   }
 });
 
-$('#btn-google').addEventListener('click', async () => {
+// ------------------------------------------------------------
+// Google sign-in via Google Identity Services (GIS), not Firebase's
+// own popup/redirect flow. GIS uses Chrome's FedCM mechanism, which
+// is built to keep working even when third-party storage/cookies
+// are blocked — the exact thing that breaks Firebase's own popup
+// and redirect flows on static hosts like GitHub Pages.
+// ------------------------------------------------------------
+async function handleGoogleCredential(response) {
   const errEl = $('#auth-error');
   errEl.hidden = true;
   try {
-    await signInWithRedirect(auth, googleProvider);
-    // Page navigates away to Google here; execution resumes via
-    // getRedirectResult() below once the user comes back.
+    const credential = GoogleAuthProvider.credential(response.credential);
+    await signInWithCredential(auth, credential);
   } catch (err) {
     errEl.textContent = friendlyAuthError(err);
     errEl.hidden = false;
   }
-});
+}
 
-// Picks up the result after the browser returns from Google's sign-in page.
-getRedirectResult(auth).catch((err) => {
-  $('#auth-error').textContent = friendlyAuthError(err);
-  $('#auth-error').hidden = false;
+function waitForGoogleIdentity(cb, triesLeft = 50) {
+  if (window.google && window.google.accounts && window.google.accounts.id) { cb(); return; }
+  if (triesLeft <= 0) { $('#google-btn-fallback').hidden = false; return; }
+  setTimeout(() => waitForGoogleIdentity(cb, triesLeft - 1), 100);
+}
+
+waitForGoogleIdentity(() => {
+  google.accounts.id.initialize({
+    client_id: googleClientId,
+    callback: handleGoogleCredential,
+    ux_mode: 'popup'
+  });
+  google.accounts.id.renderButton(
+    $('#google-btn-container'),
+    { theme: 'outline', size: 'large', width: 324, text: 'continue_with' }
+  );
 });
 
 function friendlyAuthError(err) {

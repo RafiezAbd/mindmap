@@ -17,6 +17,20 @@ export const firebaseConfig = {
   projectId: "mindmapdash",
   storageBucket: "mindmapdash.firebasestorage.app",
   messagingSenderId: "844299940735",
-  appId: "1:844299940735:web:fdf45c21be31e38fb8204a",
-  measurementId: "G-NKFZ5P35XT"
+  appId: "1:844299940735:web:fdf45c21be31e38fb8204a"
 };
+
+// ------------------------------------------------------------
+// Google OAuth Web Client ID (NOT the same as apiKey above).
+// Firebase auto-created this the moment you enabled Google as a
+// sign-in provider. Find it at:
+//   Google Cloud Console → APIs & Services → Credentials
+//   → look under "OAuth 2.0 Client IDs" for
+//     "Web client (auto created by Google Service)"
+// It looks like: 123456789-abc123xyz.apps.googleusercontent.com
+//
+// Also add your site's exact origin (e.g. https://you.github.io,
+// no trailing slash/path) to that client's "Authorized JavaScript
+// origins" list on the same page.
+// ------------------------------------------------------------
+export const googleClientId = "844299940735-009nqoktkpidar6ndhbqspdaugonln9g.apps.googleusercontent.com";
