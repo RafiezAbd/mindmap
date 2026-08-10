@@ -9,6 +9,8 @@
   --line: rgba(255,255,255,0.10);
   --accent: #ff6b5b;
   --accent-soft: rgba(255,107,91,0.18);
+  --accent-blue: #5b9dff;
+  --accent-green: #4fd1a5;
   --text-hi: #f4f2ec;
   --text-lo: #9a9ba3;
   --danger: #ff5d5d;
@@ -61,6 +63,18 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 .btn-primary:hover { background: #ff7c6d; }
 .btn-ghost { border-color: transparent; color: var(--text-lo); }
 .btn-ghost:hover { color: var(--text-hi); background: rgba(255,255,255,0.06); }
+.btn-blue {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #0c1a30;
+}
+.btn-blue:hover { background: #79b1ff; }
+.btn-green {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+  color: #0c2a1f;
+}
+.btn-green:hover { background: #6fdcb6; }
 .btn-block { width: 100%; }
 .btn-icon {
   width: 30px; height: 30px; padding: 0;
@@ -225,6 +239,14 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 }
 .dash-brand { display: flex; align-items: center; gap: 8px; color: var(--accent); }
 .dash-brand-name { color: var(--text-hi); font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.dash-version {
+  color: var(--text-lo);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
 .dash-user { display: flex; align-items: center; gap: 12px; }
 .dash-email { color: var(--text-lo); font-size: 12.5px; }
 .dash-main { max-width: 1080px; margin: 0 auto; width: 100%; padding: 36px 28px 60px; }
