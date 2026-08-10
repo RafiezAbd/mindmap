@@ -82,15 +82,16 @@
 
     <main class="dash-main">
       <div class="dash-title-row">
-        <h2>Your mind maps</h2>
+        <h2>Your workspace</h2>
         <div class="dash-title-actions">
           <button id="btn-join-map" class="btn btn-ghost">Join with a code</button>
+          <button id="btn-new-board" class="btn btn-ghost">+ New board</button>
           <button id="btn-new-map" class="btn btn-primary">+ New mind map</button>
         </div>
       </div>
       <div id="dash-empty" class="dash-empty" hidden>
-        <p>No mind maps yet.</p>
-        <p class="dash-empty-sub">Start one — every big idea begins as a single node.</p>
+        <p>Nothing here yet.</p>
+        <p class="dash-empty-sub">Start a mind map to get ideas out of your head, or a board to track work.</p>
       </div>
       <div id="dash-grid" class="dash-grid"></div>
     </main>
@@ -129,17 +130,33 @@
     </div>
   </section>
 
+  <!-- ===================== BOARD VIEW ===================== -->
+  <section id="view-board" class="view view-board" hidden>
+    <header class="ed-topbar">
+      <button id="btn-board-back" class="btn btn-ghost" title="Back to your workspace">← Boards</button>
+      <input id="board-title-input" class="map-title-input" value="Untitled board" spellcheck="false" />
+      <span id="board-save-status" class="save-status">Saved</span>
+      <div class="ed-topbar-spacer"></div>
+      <button id="btn-board-share" class="btn btn-ghost" title="Invite a collaborator">Share</button>
+      <button id="btn-board-export" class="btn btn-ghost" title="Export this board as JSON">Export</button>
+    </header>
+
+    <div class="board-body">
+      <div id="board-columns" class="board-columns"></div>
+    </div>
+  </section>
+
   <!-- ===================== JOIN MODAL ===================== -->
   <div id="join-modal" class="modal-overlay" hidden>
     <div class="modal-card">
-      <h3>Join a shared mind map</h3>
+      <h3>Join a shared map or board</h3>
       <p class="modal-sub">Enter the code a collaborator sent you.</p>
       <form id="join-form">
         <input id="join-code-input" class="join-code-input" maxlength="8" placeholder="ABC123" autocomplete="off" />
         <p id="join-error" class="auth-error" hidden></p>
         <div class="modal-actions">
           <button type="button" id="join-cancel" class="btn btn-ghost">Cancel</button>
-          <button type="submit" class="btn btn-primary">Join map</button>
+          <button type="submit" class="btn btn-primary">Join</button>
         </div>
       </form>
     </div>
@@ -156,7 +173,7 @@
       <button id="share-copy" class="btn btn-primary btn-tiny">Copy</button>
     </div>
     <button id="share-copy-message" class="btn btn-ghost btn-tiny share-copy-message">✉ Copy invite message</button>
-    <p class="share-hint">Anyone with this code can join and edit this map in real time.</p>
+    <p class="share-hint">Anyone with this code can join and edit this in real time.</p>
     <div id="share-collab-list" class="share-collab-list"></div>
   </div>
 

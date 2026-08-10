@@ -28,7 +28,7 @@ const $all = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const uid4 = () => Math.random().toString(36).slice(2, 10);
 
 function showView(name) {
-  ['auth', 'dashboard', 'editor'].forEach(v => {
+  ['auth', 'dashboard', 'editor', 'board'].forEach(v => {
     $(`#view-${v}`).hidden = v !== name;
   });
 }
@@ -178,25 +178,34 @@ function openJoinModalFromLink() {
 
 // ============================================================
 // DASHBOARD
-// Maps live in a top-level `maps` collection so they can be
-// shared. A user sees a map if they are the owner OR listed
-// in its `collaborators` array.
+// Maps and boards each live in their own top-level collection so
+// they can be shared independently. A user sees an item if they
+// are the owner OR listed in its `collaborators` array. The
+// dashboard queries both collections and merges them into one list.
 // ============================================================
 function mapsCollection() {
   return collection(db, 'maps');
+}
+function boardsCollection() {
+  return collection(db, 'boards');
 }
 
 async function loadDashboard() {
   const grid = $('#dash-grid');
   grid.innerHTML = '<p style="color:var(--text-lo); font-size:13px;">Loading…</p>';
   try {
-    const ownedQ = query(mapsCollection(), where('ownerId', '==', currentUser.uid));
-    const sharedQ = query(mapsCollection(), where('collaborators', 'array-contains', currentUser.uid));
-    const [ownedSnap, sharedSnap] = await Promise.all([getDocs(ownedQ), getDocs(sharedQ)]);
+    const [mapOwned, mapShared, boardOwned, boardShared] = await Promise.all([
+      getDocs(query(mapsCollection(), where('ownerId', '==', currentUser.uid))),
+      getDocs(query(mapsCollection(), where('collaborators', 'array-contains', currentUser.uid))),
+      getDocs(query(boardsCollection(), where('ownerId', '==', currentUser.uid))),
+      getDocs(query(boardsCollection(), where('collaborators', 'array-contains', currentUser.uid)))
+    ]);
 
-    const seen = new Map();
-    ownedSnap.forEach(d => seen.set(d.id, d.data()));
-    sharedSnap.forEach(d => { if (!seen.has(d.id)) seen.set(d.id, d.data()); });
+    const seen = new Map(); // id -> { data, kind }
+    mapOwned.forEach(d => seen.set('map:' + d.id, { id: d.id, data: d.data(), kind: 'map' }));
+    mapShared.forEach(d => { if (!seen.has('map:' + d.id)) seen.set('map:' + d.id, { id: d.id, data: d.data(), kind: 'map' }); });
+    boardOwned.forEach(d => seen.set('board:' + d.id, { id: d.id, data: d.data(), kind: 'board' }));
+    boardShared.forEach(d => { if (!seen.has('board:' + d.id)) seen.set('board:' + d.id, { id: d.id, data: d.data(), kind: 'board' }); });
 
     grid.innerHTML = '';
     if (seen.size === 0) {
@@ -205,42 +214,49 @@ async function loadDashboard() {
     }
     $('#dash-empty').hidden = true;
 
-    const entries = Array.from(seen.entries()).sort((a, b) => {
-      const ta = a[1].updatedAt?.toMillis ? a[1].updatedAt.toMillis() : 0;
-      const tb = b[1].updatedAt?.toMillis ? b[1].updatedAt.toMillis() : 0;
+    const entries = Array.from(seen.values()).sort((a, b) => {
+      const ta = a.data.updatedAt?.toMillis ? a.data.updatedAt.toMillis() : 0;
+      const tb = b.data.updatedAt?.toMillis ? b.data.updatedAt.toMillis() : 0;
       return tb - ta;
     });
-    entries.forEach(([id, data]) => grid.appendChild(renderMapCard(id, data)));
+    entries.forEach(({ id, data, kind }) => grid.appendChild(renderItemCard(id, data, kind)));
   } catch (err) {
-    grid.innerHTML = `<p style="color:var(--danger); font-size:13px;">Couldn't load your maps: ${escapeHtml(err.message)}</p>`;
+    grid.innerHTML = `<p style="color:var(--danger); font-size:13px;">Couldn't load your workspace: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-function renderMapCard(id, data) {
+function renderItemCard(id, data, kind) {
   const card = document.createElement('div');
   card.className = 'map-card';
-  const nodeCount = data.nodes ? Object.keys(data.nodes).length : 0;
+  const isBoard = kind === 'board';
+  const countLabel = isBoard
+    ? `${data.cards ? Object.keys(data.cards).length : 0} card${(data.cards ? Object.keys(data.cards).length : 0) === 1 ? '' : 's'}`
+    : `${data.nodes ? Object.keys(data.nodes).length : 0} node${(data.nodes ? Object.keys(data.nodes).length : 0) === 1 ? '' : 's'}`;
   const updated = data.updatedAt && data.updatedAt.toDate ? data.updatedAt.toDate() : null;
   const owner = data.ownerId === currentUser.uid;
+  const kindLabel = isBoard ? 'Board' : 'Map';
+  const badgeLabel = owner ? kindLabel : `Shared ${kindLabel}`;
   card.innerHTML = `
-    <div class="map-card-glow" style="background:radial-gradient(circle at 30% 20%, hsl(8 90% 60%), transparent 70%)"></div>
-    ${owner ? '' : '<span class="map-card-badge">Shared</span>'}
-    <button class="map-card-del" title="${owner ? 'Delete map' : 'Leave map'}">${owner ? '✕' : '⏏'}</button>
-    <h3>${escapeHtml(data.title || 'Untitled map')}</h3>
-    <div class="map-card-meta">${nodeCount} node${nodeCount === 1 ? '' : 's'} · ${updated ? relativeTime(updated) : 'just now'}</div>
+    <div class="map-card-glow" style="background:radial-gradient(circle at 30% 20%, hsl(${isBoard ? 200 : 8} 90% 60%), transparent 70%)"></div>
+    <span class="map-card-badge">${badgeLabel}</span>
+    <button class="map-card-del" title="${owner ? 'Delete' : 'Leave'}">${owner ? '✕' : '⏏'}</button>
+    <h3>${escapeHtml(data.title || (isBoard ? 'Untitled board' : 'Untitled map'))}</h3>
+    <div class="map-card-meta">${countLabel} · ${updated ? relativeTime(updated) : 'just now'}</div>
   `;
   card.addEventListener('click', (e) => {
     if (e.target.closest('.map-card-del')) return;
-    openMap(id);
+    if (isBoard) openBoard(id); else openMap(id);
   });
   card.querySelector('.map-card-del').addEventListener('click', async (e) => {
     e.stopPropagation();
+    const coll = isBoard ? 'boards' : 'maps';
+    const label = data.title || (isBoard ? 'Untitled board' : 'Untitled map');
     if (owner) {
-      if (!confirm(`Delete "${data.title || 'Untitled map'}"? This can't be undone.`)) return;
-      await deleteDoc(doc(db, 'maps', id));
+      if (!confirm(`Delete "${label}"? This can't be undone.`)) return;
+      await deleteDoc(doc(db, coll, id));
     } else {
-      if (!confirm(`Leave "${data.title || 'Untitled map'}"? You'll need a new invite code to rejoin.`)) return;
-      await updateDoc(doc(db, 'maps', id), { collaborators: arrayRemove(currentUser.uid) });
+      if (!confirm(`Leave "${label}"? You'll need a new invite code to rejoin.`)) return;
+      await updateDoc(doc(db, coll, id), { collaborators: arrayRemove(currentUser.uid) });
     }
     loadDashboard();
   });
@@ -296,6 +312,27 @@ $('#btn-new-map').addEventListener('click', async () => {
   openMap(ref.id);
 });
 
+$('#btn-new-board').addEventListener('click', async () => {
+  const colIds = ['col_todo', 'col_doing', 'col_done'];
+  const newDoc = {
+    title: 'Untitled board',
+    ownerId: currentUser.uid,
+    ownerEmail: currentUser.email || '',
+    collaborators: [],
+    shareCode: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    columns: {
+      [colIds[0]]: { title: 'To Do', order: 0 },
+      [colIds[1]]: { title: 'In Progress', order: 1 },
+      [colIds[2]]: { title: 'Done', order: 2 }
+    },
+    cards: {}
+  };
+  const ref = await addDoc(boardsCollection(), newDoc);
+  openBoard(ref.id);
+});
+
 $('#btn-back').addEventListener('click', () => {
   stopAutosaveLoop();
   stopMapListener();
@@ -304,8 +341,16 @@ $('#btn-back').addEventListener('click', () => {
   loadDashboard();
 });
 
+$('#btn-board-back').addEventListener('click', () => {
+  stopBoardAutosaveLoop();
+  stopBoardListener();
+  $('#share-panel').hidden = true;
+  showView('dashboard');
+  loadDashboard();
+});
+
 // ------------------------------------------------------------
-// Join a shared map by code
+// Join a shared map or board by code
 // ------------------------------------------------------------
 $('#btn-join-map').addEventListener('click', () => {
   $('#join-code-input').value = '';
@@ -323,19 +368,32 @@ $('#join-form').addEventListener('submit', async (e) => {
   errEl.hidden = true;
   if (!code) return;
   try {
-    const codeSnap = await getDoc(doc(db, 'joinCodes', code));
+    let codeSnap = await getDoc(doc(db, 'joinCodes', code));
+    let kind = 'map';
     if (!codeSnap.exists()) {
-      errEl.textContent = "That code doesn't match any shared map.";
+      codeSnap = await getDoc(doc(db, 'boardJoinCodes', code));
+      kind = 'board';
+    }
+    if (!codeSnap.exists()) {
+      errEl.textContent = "That code doesn't match any shared map or board.";
       errEl.hidden = false;
       return;
     }
-    const { mapId: targetMapId } = codeSnap.data();
-    await updateDoc(doc(db, 'maps', targetMapId), { collaborators: arrayUnion(currentUser.uid) });
-    $('#join-modal').hidden = true;
-    toast('Joined the map');
-    openMap(targetMapId);
+    if (kind === 'map') {
+      const { mapId: targetMapId } = codeSnap.data();
+      await updateDoc(doc(db, 'maps', targetMapId), { collaborators: arrayUnion(currentUser.uid) });
+      $('#join-modal').hidden = true;
+      toast('Joined the map');
+      openMap(targetMapId);
+    } else {
+      const { boardId: targetBoardId } = codeSnap.data();
+      await updateDoc(doc(db, 'boards', targetBoardId), { collaborators: arrayUnion(currentUser.uid) });
+      $('#join-modal').hidden = true;
+      toast('Joined the board');
+      openBoard(targetBoardId);
+    }
   } catch (err) {
-    errEl.textContent = "Couldn't join that map. Double-check the code and try again.";
+    errEl.textContent = "Couldn't join that map or board. Double-check the code and try again.";
     errEl.hidden = false;
   }
 });
@@ -350,6 +408,18 @@ let editingId = null;
 let draggingId = null;
 let unsubscribeMap = null;
 
+// Board editor state — kept separate from the map editor's above
+// rather than unified, since only one editor is ever open at a time
+// and separate state is easier to reason about than shared mutable
+// state across two fairly different data shapes.
+let boardId = null;
+let boardData = null;       // { title, ownerId, collaborators, columns: {id:{...}}, cards: {id:{...}} }
+let boardEditingId = null;  // id of the card/column currently being renamed
+let boardDraggingCardId = null;
+let unsubscribeBoard = null;
+let boardPendingWrites = {};
+let boardAutosaveInterval = null;
+
 // granular pending writes so autosave never clobbers a collaborator's
 // concurrent edits with a stale full-document overwrite
 let pendingWrites = {};   // e.g. { 'nodes.abc123': {...}, 'title': 'New title' }
@@ -360,6 +430,8 @@ const SIB_SPACING_Y = 76;
 
 async function openMap(id) {
   mapId = id;
+  activeKind = 'map';
+  activeId = id;
   const snap = await getDoc(doc(db, 'maps', id));
   if (!snap.exists()) { toast('That map no longer exists.'); showView('dashboard'); loadDashboard(); return; }
   mapData = snap.data();
@@ -381,12 +453,27 @@ async function openMap(id) {
   startMapListener();
 }
 
+// Tracks whichever editor (map or board) is currently open, so shared
+// UI — the share panel and export button — knows which collection/doc
+// to act on without map-specific and board-specific code needing to
+// duplicate that logic.
+let activeKind = null; // 'map' | 'board'
+let activeId = null;
+function activeData() { return activeKind === 'board' ? boardData : mapData; }
+function activeCollectionName() { return activeKind === 'board' ? 'boards' : 'maps'; }
+function activeJoinCodeCollectionName() { return activeKind === 'board' ? 'boardJoinCodes' : 'joinCodes'; }
+
 function isOwner() {
-  return mapData && mapData.ownerId === currentUser.uid;
+  const d = activeData();
+  return d && d.ownerId === currentUser.uid;
 }
 
 function updateShareButtonVisibility() {
-  $('#btn-share').textContent = isOwner() ? 'Share' : 'Shared map';
+  const owner = isOwner();
+  const label = activeKind === 'board' ? 'board' : 'map';
+  const text = owner ? 'Share' : `Shared ${label}`;
+  const mapBtn = $('#btn-share'); if (mapBtn) mapBtn.textContent = text;
+  const boardBtn = $('#btn-board-share'); if (boardBtn) boardBtn.textContent = text;
 }
 
 // ------------------------------------------------------------
@@ -412,6 +499,8 @@ function stopMapListener() {
   unsubscribeMap = null;
 }
 
+// Generic flat-object field comparison — used for map nodes as well as
+// board columns/cards, since all of those are flat objects of primitives.
 function nodesEqual(a, b) {
   if (a === b) return true;
   if (!a || !b) return false;
@@ -1008,30 +1097,36 @@ $('#map-title-input').addEventListener('change', () => {
 });
 
 // ============================================================
-// Share panel (owner: invite code + collaborator list)
+// Share panel (owner: invite code + collaborator list) — shared
+// between the map editor and board editor via activeKind/activeId.
 // ============================================================
-$('#btn-share').addEventListener('click', async (e) => {
-  e.stopPropagation();
-  if (!isOwner()) { toast('Only the map owner can manage sharing.'); return; }
+function openSharePanel() {
+  if (!isOwner()) { toast(`Only the ${activeKind === 'board' ? 'board' : 'map'} owner can manage sharing.`); return; }
   const panel = $('#share-panel');
   if (!panel.hidden) { panel.hidden = true; return; }
-  if (!mapData.shareCode) await regenerateShareCode(/*silent=*/true);
-  renderSharePanel();
-  panel.hidden = false;
-});
+  (async () => {
+    if (!activeData().shareCode) await regenerateShareCode(/*silent=*/true);
+    renderSharePanel();
+    panel.hidden = false;
+  })();
+}
+$('#btn-share').addEventListener('click', (e) => { e.stopPropagation(); openSharePanel(); });
+$('#btn-board-share').addEventListener('click', (e) => { e.stopPropagation(); openSharePanel(); });
+
 document.addEventListener('click', (e) => {
   const panel = $('#share-panel');
-  if (!panel.hidden && !panel.contains(e.target) && e.target.id !== 'btn-share') panel.hidden = true;
+  if (!panel.hidden && !panel.contains(e.target) && e.target.id !== 'btn-share' && e.target.id !== 'btn-board-share') panel.hidden = true;
 });
 
 function renderSharePanel() {
-  $('#share-code-value').textContent = mapData.shareCode || '------';
+  $('#share-code-value').textContent = activeData().shareCode || '------';
   renderShareCollabList();
 }
 
 function renderShareCollabList() {
   const list = $('#share-collab-list');
-  const collabs = mapData.collaborators || [];
+  const data = activeData();
+  const collabs = data.collaborators || [];
   if (collabs.length === 0) {
     list.innerHTML = '<p class="share-owner-note">No collaborators yet — send them the code above.</p>';
     return;
@@ -1044,8 +1139,8 @@ function renderShareCollabList() {
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
     removeBtn.addEventListener('click', async () => {
-      mapData.collaborators = mapData.collaborators.filter(u => u !== uidVal);
-      await updateDoc(doc(db, 'maps', mapId), { collaborators: arrayRemove(uidVal) });
+      data.collaborators = data.collaborators.filter(u => u !== uidVal);
+      await updateDoc(doc(db, activeCollectionName(), activeId), { collaborators: arrayRemove(uidVal) });
       renderShareCollabList();
     });
     row.appendChild(removeBtn);
@@ -1054,12 +1149,15 @@ function renderShareCollabList() {
 }
 
 async function regenerateShareCode(silent) {
-  const oldCode = mapData.shareCode;
+  const data = activeData();
+  const oldCode = data.shareCode;
   const newCode = makeShareCode();
-  mapData.shareCode = newCode;
-  await setDoc(doc(db, 'joinCodes', newCode), { mapId, ownerId: currentUser.uid });
-  await updateDoc(doc(db, 'maps', mapId), { shareCode: newCode });
-  if (oldCode) { try { await deleteDoc(doc(db, 'joinCodes', oldCode)); } catch (_) { /* ignore */ } }
+  data.shareCode = newCode;
+  const codeCollection = activeJoinCodeCollectionName();
+  const idField = activeKind === 'board' ? 'boardId' : 'mapId';
+  await setDoc(doc(db, codeCollection, newCode), { [idField]: activeId, ownerId: currentUser.uid });
+  await updateDoc(doc(db, activeCollectionName(), activeId), { shareCode: newCode });
+  if (oldCode) { try { await deleteDoc(doc(db, codeCollection, oldCode)); } catch (_) { /* ignore */ } }
   if (!silent) toast('New invite code generated');
 }
 
@@ -1071,18 +1169,20 @@ $('#share-regen').addEventListener('click', async (e) => {
 
 $('#share-copy').addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(mapData.shareCode || '');
+    await navigator.clipboard.writeText(activeData().shareCode || '');
     toast('Code copied');
   } catch (_) {
-    toast(mapData.shareCode || '');
+    toast(activeData().shareCode || '');
   }
 });
 
 $('#share-copy-message').addEventListener('click', async () => {
-  const code = mapData.shareCode || '';
+  const data = activeData();
+  const code = data.shareCode || '';
   const link = `${location.origin}${location.pathname}?code=${code}`;
-  const title = mapData.title || 'Untitled map';
-  const message = `Join my mind map "${title}" on Mindmap: ${link}\nInvite code: ${code}`;
+  const itemWord = activeKind === 'board' ? 'board' : 'mind map';
+  const title = data.title || `Untitled ${itemWord}`;
+  const message = `Join my ${itemWord} "${title}" on Branchwork: ${link}\nInvite code: ${code}`;
   try {
     await navigator.clipboard.writeText(message);
     toast('Invite message copied');
@@ -1137,22 +1237,585 @@ async function saveIfDirty() {
   }
 }
 
-window.addEventListener('beforeunload', () => { if (Object.keys(pendingWrites).length) saveIfDirty(); });
+window.addEventListener('beforeunload', () => {
+  if (Object.keys(pendingWrites).length) saveIfDirty();
+  if (Object.keys(boardPendingWrites).length) saveBoardIfDirty();
+});
 
 // ============================================================
 // Export
 // ============================================================
-$('#btn-export').addEventListener('click', () => {
-  if (!mapData) return;
-  const blob = new Blob([JSON.stringify(mapData, null, 2)], { type: 'application/json' });
+function exportActiveItem() {
+  const data = activeData();
+  if (!data) return;
+  const itemWord = activeKind === 'board' ? 'board' : 'map';
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${(mapData.title || 'mindmap').replace(/[^a-z0-9-_]+/gi, '_')}.json`;
+  a.download = `${(data.title || itemWord).replace(/[^a-z0-9-_]+/gi, '_')}.json`;
   a.click();
   URL.revokeObjectURL(url);
-  toast('Map exported as JSON');
+  toast(`${activeKind === 'board' ? 'Board' : 'Map'} exported as JSON`);
+}
+$('#btn-export').addEventListener('click', exportActiveItem);
+$('#btn-board-export').addEventListener('click', exportActiveItem);
+
+// ============================================================
+// BOARD EDITOR (Kanban)
+// Columns + cards, drag to reorder/move, optional due dates,
+// preset label colors, real-time sync — same overall pattern as
+// the map editor (granular writes, stable-diff merge, never
+// rebuilding mid-edit/mid-drag), kept as its own parallel set of
+// functions rather than unified with the map editor's, since the
+// two data shapes are different enough that sharing state would
+// add more risk than it'd save code.
+// ============================================================
+const CARD_PALETTE = [
+  { key: 'red', hue: 0 }, { key: 'orange', hue: 28 }, { key: 'yellow', hue: 48 },
+  { key: 'green', hue: 145 }, { key: 'blue', hue: 205 }, { key: 'purple', hue: 265 }, { key: 'pink', hue: 325 }
+];
+
+const boardColumnsEl = $('#board-columns');
+
+async function openBoard(id) {
+  boardId = id;
+  activeKind = 'board';
+  activeId = id;
+  const snap = await getDoc(doc(db, 'boards', id));
+  if (!snap.exists()) { toast('That board no longer exists.'); showView('dashboard'); loadDashboard(); return; }
+  boardData = snap.data();
+  if (!boardData.columns) boardData.columns = {};
+  if (!boardData.cards) boardData.cards = {};
+  if (!boardData.collaborators) boardData.collaborators = [];
+  boardEditingId = null;
+  boardDraggingCardId = null;
+  boardPendingWrites = {};
+
+  $('#board-title-input').value = boardData.title || 'Untitled board';
+  $('#share-panel').hidden = true;
+  updateShareButtonVisibility();
+  showView('board');
+  renderBoard();
+  startBoardAutosaveLoop();
+  startBoardListener();
+}
+
+function boardColumnsSorted() {
+  return Object.entries(boardData.columns)
+    .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
+    .map(([id]) => id);
+}
+function boardCardsInColumn(colId) {
+  return Object.entries(boardData.cards)
+    .filter(([, c]) => c.columnId === colId)
+    .sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
+    .map(([id]) => id);
+}
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function formatDueDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ------------------------------------------------------------
+// Rendering
+// ------------------------------------------------------------
+function renderBoard() {
+  boardColumnsEl.innerHTML = '';
+  boardColumnsSorted().forEach((colId, i, arr) => boardColumnsEl.appendChild(makeColumnEl(colId, i, arr.length)));
+  const addColBtn = document.createElement('button');
+  addColBtn.className = 'board-add-column';
+  addColBtn.textContent = '+ Add column';
+  addColBtn.addEventListener('click', addColumn);
+  boardColumnsEl.appendChild(addColBtn);
+}
+
+function makeColumnEl(colId, index, total) {
+  const col = boardData.columns[colId];
+  const el = document.createElement('div');
+  el.className = 'board-column';
+  el.dataset.colId = colId;
+
+  const header = document.createElement('div');
+  header.className = 'board-column-header';
+
+  const titleInput = document.createElement('input');
+  titleInput.className = 'board-column-title';
+  titleInput.value = col.title;
+  titleInput.spellcheck = false;
+  titleInput.addEventListener('change', () => {
+    col.title = titleInput.value.trim() || 'Untitled column';
+    titleInput.value = col.title;
+    queueColumnWrite(colId);
+  });
+  header.appendChild(titleInput);
+
+  const countEl = document.createElement('span');
+  countEl.className = 'board-column-count';
+  countEl.textContent = boardCardsInColumn(colId).length;
+  header.appendChild(countEl);
+
+  if (index > 0) {
+    const leftBtn = document.createElement('button');
+    leftBtn.className = 'board-column-move';
+    leftBtn.textContent = '←';
+    leftBtn.title = 'Move column left';
+    leftBtn.addEventListener('click', () => moveColumn(colId, -1));
+    header.appendChild(leftBtn);
+  }
+  if (index < total - 1) {
+    const rightBtn = document.createElement('button');
+    rightBtn.className = 'board-column-move';
+    rightBtn.textContent = '→';
+    rightBtn.title = 'Move column right';
+    rightBtn.addEventListener('click', () => moveColumn(colId, 1));
+    header.appendChild(rightBtn);
+  }
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'board-column-del';
+  delBtn.textContent = '✕';
+  delBtn.title = 'Delete column';
+  delBtn.addEventListener('click', () => deleteColumn(colId));
+  header.appendChild(delBtn);
+
+  el.appendChild(header);
+
+  const cardsEl = document.createElement('div');
+  cardsEl.className = 'board-column-cards';
+  cardsEl.dataset.colId = colId;
+  boardCardsInColumn(colId).forEach(cardId => cardsEl.appendChild(makeCardEl(cardId)));
+  el.appendChild(cardsEl);
+
+  const addCardBtn = document.createElement('button');
+  addCardBtn.className = 'board-add-card';
+  addCardBtn.textContent = '+ Add card';
+  addCardBtn.addEventListener('click', () => addCard(colId));
+  el.appendChild(addCardBtn);
+
+  return el;
+}
+
+function makeCardEl(cardId) {
+  const c = boardData.cards[cardId];
+  const el = document.createElement('div');
+  el.className = 'board-card';
+  el.dataset.cardId = cardId;
+  if (c.color) {
+    const p = CARD_PALETTE.find(p => p.key === c.color);
+    if (p) el.style.borderLeftColor = `hsl(${p.hue} 70% 55%)`;
+  }
+
+  const text = document.createElement('div');
+  text.className = 'board-card-text';
+  text.textContent = c.text;
+  if (cardId === boardEditingId) text.contentEditable = 'true';
+  text.addEventListener('dblclick', (e) => { e.stopPropagation(); startCardEditing(cardId); });
+  text.addEventListener('blur', () => { if (boardEditingId === cardId) commitCardEditing(text); });
+  text.addEventListener('keydown', (e) => {
+    if (boardEditingId !== cardId) return;
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); text.blur(); }
+  });
+  el.appendChild(text);
+
+  const meta = document.createElement('div');
+  meta.className = 'board-card-meta';
+
+  if (c.dueDate) {
+    const due = document.createElement('span');
+    due.className = 'board-card-due' + (c.dueDate < todayStr() ? ' is-overdue' : '');
+    due.textContent = formatDueDate(c.dueDate);
+    meta.appendChild(due);
+  } else {
+    meta.appendChild(document.createElement('span')); // keeps actions right-aligned via flex
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'board-card-actions';
+
+  const dueBtn = document.createElement('button');
+  dueBtn.textContent = '📅';
+  dueBtn.title = 'Set due date';
+  dueBtn.addEventListener('click', (e) => { e.stopPropagation(); openDuePicker(cardId, el); });
+  actions.appendChild(dueBtn);
+
+  const colorBtn = document.createElement('button');
+  colorBtn.textContent = '🎨';
+  colorBtn.title = 'Cycle label color';
+  colorBtn.addEventListener('click', (e) => { e.stopPropagation(); cycleCardColor(cardId); });
+  actions.appendChild(colorBtn);
+
+  const delBtn = document.createElement('button');
+  delBtn.textContent = '🗑';
+  delBtn.title = 'Delete card';
+  delBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteCard(cardId); });
+  actions.appendChild(delBtn);
+
+  meta.appendChild(actions);
+  el.appendChild(meta);
+
+  const tip = attributionTooltip(c);
+  if (tip) el.title = tip;
+
+  attachCardDrag(el, cardId);
+  return el;
+}
+
+// ------------------------------------------------------------
+// Due-date popover — a small inline native date input anchored
+// to whichever card's calendar icon was clicked.
+// ------------------------------------------------------------
+function closeDuePicker() {
+  const existing = document.getElementById('due-picker');
+  if (existing) existing.remove();
+}
+function openDuePicker(cardId, cardEl) {
+  closeDuePicker();
+  const c = boardData.cards[cardId];
+  const pop = document.createElement('div');
+  pop.className = 'due-picker';
+  pop.id = 'due-picker';
+
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = c.dueDate || '';
+  input.addEventListener('change', () => {
+    c.dueDate = input.value || null;
+    queueCardWrite(cardId);
+    closeDuePicker();
+    renderBoard();
+  });
+  pop.appendChild(input);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = 'Clear';
+  clearBtn.className = 'btn btn-ghost btn-tiny';
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    c.dueDate = null;
+    queueCardWrite(cardId);
+    closeDuePicker();
+    renderBoard();
+  });
+  pop.appendChild(clearBtn);
+
+  document.body.appendChild(pop);
+  const rect = cardEl.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth - 240) + 'px';
+  pop.style.top = (rect.bottom + 6) + 'px';
+  input.focus();
+}
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('due-picker');
+  if (pop && !pop.contains(e.target) && !e.target.closest('.board-card-actions')) closeDuePicker();
 });
+
+function cycleCardColor(cardId) {
+  const c = boardData.cards[cardId];
+  const keys = [null, ...CARD_PALETTE.map(p => p.key)];
+  const idx = keys.indexOf(c.color || null);
+  c.color = keys[(idx + 1) % keys.length];
+  queueCardWrite(cardId);
+  renderBoard();
+}
+
+// ------------------------------------------------------------
+// Card CRUD + drag
+// ------------------------------------------------------------
+function addCard(colId) {
+  const id = uid4();
+  const order = boardCardsInColumn(colId).length;
+  boardData.cards[id] = {
+    text: '', columnId: colId, order, color: null, dueDate: null,
+    createdBy: currentUser.uid, createdByName: currentUser.displayName || currentUser.email || 'Someone', createdAt: Date.now()
+  };
+  queueCardWrite(id);
+  renderBoard();
+  startCardEditing(id);
+}
+
+function deleteCard(cardId) {
+  const c = boardData.cards[cardId];
+  if (!confirm(`Delete "${c.text || 'this card'}"?`)) return;
+  delete boardData.cards[cardId];
+  queueCardDelete(cardId);
+  renderBoard();
+}
+
+function startCardEditing(cardId) {
+  boardEditingId = cardId;
+  renderBoard();
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = boardColumnsEl.querySelector(`.board-card[data-card-id="${cardId}"] .board-card-text`);
+      if (el) { el.focus(); document.getSelection().selectAllChildren(el); }
+    });
+  });
+}
+
+function commitCardEditing(textEl) {
+  const cardId = textEl.closest('.board-card').dataset.cardId;
+  const c = boardData.cards[cardId];
+  const text = textEl.textContent.trim();
+  if (!text) {
+    if (!c.text) {
+      // a freshly created card the user left blank — discard rather than
+      // leaving an empty card sitting on the board
+      delete boardData.cards[cardId];
+      queueCardDelete(cardId);
+    }
+    boardEditingId = null;
+    renderBoard();
+    return;
+  }
+  if (c.text !== text) {
+    c.text = text;
+    c.updatedBy = currentUser.uid;
+    c.updatedByName = currentUser.displayName || currentUser.email || 'Someone';
+    c.updatedAt = Date.now();
+    queueCardWrite(cardId);
+  }
+  boardEditingId = null;
+  textEl.contentEditable = 'false';
+  renderBoard();
+}
+
+function attachCardDrag(el, cardId) {
+  let dragging = false, moved = false, startX, startY;
+
+  el.addEventListener('pointerdown', (e) => {
+    if (el.querySelector('.board-card-text').isContentEditable) return;
+    if (e.target.closest('.board-card-actions')) return;
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    dragging = true; moved = false;
+    startX = e.clientX; startY = e.clientY;
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    if (!moved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+    if (!moved) {
+      moved = true;
+      boardDraggingCardId = cardId;
+      el.classList.add('is-dragging');
+    }
+    el.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    el.style.pointerEvents = '';
+    const colList = under && under.closest('.board-column-cards');
+    if (colList) {
+      const siblings = Array.from(colList.querySelectorAll('.board-card')).filter(c => c !== el);
+      let placed = false;
+      for (const sib of siblings) {
+        const r = sib.getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) { colList.insertBefore(el, sib); placed = true; break; }
+      }
+      if (!placed) colList.appendChild(el);
+    }
+  });
+
+  el.addEventListener('pointerup', () => {
+    if (!dragging) return;
+    dragging = false;
+    if (moved) {
+      el.classList.remove('is-dragging');
+      boardDraggingCardId = null;
+      commitCardDragResult();
+    }
+  });
+}
+
+function commitCardDragResult() {
+  // The drag handler already moved the live DOM elements around as
+  // feedback while dragging — read that final arrangement back into
+  // boardData rather than recomputing positions separately.
+  $all('.board-column-cards').forEach(colList => {
+    const colId = colList.dataset.colId;
+    Array.from(colList.querySelectorAll('.board-card')).forEach((cardEl, i) => {
+      const cid = cardEl.dataset.cardId;
+      const c = boardData.cards[cid];
+      if (!c) return;
+      if (c.columnId !== colId || c.order !== i) {
+        c.columnId = colId;
+        c.order = i;
+        queueCardWrite(cid);
+      }
+    });
+  });
+  renderBoard();
+}
+
+// ------------------------------------------------------------
+// Column CRUD
+// ------------------------------------------------------------
+function addColumn() {
+  const id = uid4();
+  boardData.columns[id] = { title: 'New column', order: boardColumnsSorted().length };
+  queueColumnWrite(id);
+  renderBoard();
+}
+
+function deleteColumn(colId) {
+  const cardIds = boardCardsInColumn(colId);
+  const msg = cardIds.length > 0
+    ? `Delete this column and its ${cardIds.length} card${cardIds.length === 1 ? '' : 's'}?`
+    : 'Delete this column?';
+  if (!confirm(msg)) return;
+  cardIds.forEach(cid => { delete boardData.cards[cid]; queueCardDelete(cid); });
+  delete boardData.columns[colId];
+  queueColumnDelete(colId);
+  renderBoard();
+}
+
+function moveColumn(colId, dir) {
+  const order = boardColumnsSorted();
+  const idx = order.indexOf(colId);
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= order.length) return;
+  const otherId = order[swapIdx];
+  const a = boardData.columns[colId], b = boardData.columns[otherId];
+  const tmp = a.order; a.order = b.order; b.order = tmp;
+  queueColumnWrite(colId);
+  queueColumnWrite(otherId);
+  renderBoard();
+}
+
+// ------------------------------------------------------------
+// Board title editing
+// ------------------------------------------------------------
+$('#board-title-input').addEventListener('change', () => {
+  boardData.title = $('#board-title-input').value.trim() || 'Untitled board';
+  markBoardMetaDirty();
+});
+
+// ------------------------------------------------------------
+// Real-time sync — same pattern as the map editor: stable
+// field-by-field diffing, and never rebuild the DOM while a card
+// is being typed into or dragged.
+// ------------------------------------------------------------
+function startBoardListener() {
+  stopBoardListener();
+  unsubscribeBoard = onSnapshot(doc(db, 'boards', boardId), (snap) => {
+    if (!snap.exists()) {
+      toast('This board was deleted by its owner.');
+      stopBoardAutosaveLoop(); stopBoardListener();
+      showView('dashboard'); loadDashboard();
+      return;
+    }
+    if (snap.metadata.hasPendingWrites) return;
+    mergeRemoteIntoLocalBoard(snap.data());
+  });
+}
+function stopBoardListener() {
+  if (unsubscribeBoard) unsubscribeBoard();
+  unsubscribeBoard = null;
+}
+
+function mergeRemoteIntoLocalBoard(remote) {
+  if (!boardData) return;
+  let needsRender = false;
+
+  if (boardPendingWrites['title'] === undefined && remote.title !== boardData.title) {
+    boardData.title = remote.title;
+    if (document.activeElement !== $('#board-title-input')) $('#board-title-input').value = remote.title;
+  }
+  if (remote.collaborators) {
+    boardData.collaborators = remote.collaborators;
+    if (!$('#share-panel').hidden) renderShareCollabList();
+  }
+  if (remote.shareCode !== undefined && boardPendingWrites['shareCode'] === undefined) {
+    boardData.shareCode = remote.shareCode;
+    if (!$('#share-panel').hidden) renderSharePanel();
+  }
+
+  const remoteCols = remote.columns || {};
+  const localColIds = new Set(Object.keys(boardData.columns));
+  const remoteColIds = new Set(Object.keys(remoteCols));
+  for (const id of remoteColIds) {
+    if (boardPendingWrites[`columns.${id}`] !== undefined) continue;
+    const incoming = remoteCols[id];
+    const local = boardData.columns[id];
+    if (!local || !nodesEqual(local, incoming)) { boardData.columns[id] = incoming; needsRender = true; }
+  }
+  for (const id of localColIds) {
+    if (!remoteColIds.has(id) && boardPendingWrites[`columns.${id}`] === undefined) { delete boardData.columns[id]; needsRender = true; }
+  }
+
+  const remoteCards = remote.cards || {};
+  const localCardIds = new Set(Object.keys(boardData.cards));
+  const remoteCardIds = new Set(Object.keys(remoteCards));
+  for (const id of remoteCardIds) {
+    if (boardPendingWrites[`cards.${id}`] !== undefined) continue;
+    if (id === boardEditingId || id === boardDraggingCardId) continue;
+    const incoming = remoteCards[id];
+    const local = boardData.cards[id];
+    if (!local || !nodesEqual(local, incoming)) { boardData.cards[id] = incoming; needsRender = true; }
+  }
+  for (const id of localCardIds) {
+    if (!remoteCardIds.has(id) && boardPendingWrites[`cards.${id}`] === undefined) { delete boardData.cards[id]; needsRender = true; }
+  }
+
+  if (needsRender && boardEditingId === null && boardDraggingCardId === null) renderBoard();
+}
+
+// ------------------------------------------------------------
+// Autosave — granular field writes, same reasoning as the map
+// editor's: never overwrite the whole document, only whatever
+// specific column/card actually changed.
+// ------------------------------------------------------------
+function queueColumnWrite(id) {
+  boardPendingWrites[`columns.${id}`] = JSON.parse(JSON.stringify(boardData.columns[id]));
+  markBoardSaving();
+}
+function queueColumnDelete(id) {
+  boardPendingWrites[`columns.${id}`] = deleteField();
+  markBoardSaving();
+}
+function queueCardWrite(id) {
+  boardPendingWrites[`cards.${id}`] = JSON.parse(JSON.stringify(boardData.cards[id]));
+  markBoardSaving();
+}
+function queueCardDelete(id) {
+  boardPendingWrites[`cards.${id}`] = deleteField();
+  markBoardSaving();
+}
+function markBoardMetaDirty() {
+  boardPendingWrites['title'] = boardData.title;
+  markBoardSaving();
+}
+function markBoardSaving() {
+  $('#board-save-status').textContent = 'Unsaved changes…';
+}
+
+function startBoardAutosaveLoop() {
+  stopBoardAutosaveLoop();
+  boardAutosaveInterval = setInterval(saveBoardIfDirty, 1200);
+}
+function stopBoardAutosaveLoop() {
+  if (boardAutosaveInterval) clearInterval(boardAutosaveInterval);
+  boardAutosaveInterval = null;
+}
+
+async function saveBoardIfDirty() {
+  const keys = Object.keys(boardPendingWrites);
+  if (keys.length === 0 || !boardId) return;
+  const toSend = { ...boardPendingWrites, updatedAt: serverTimestamp() };
+  boardPendingWrites = {};
+  $('#board-save-status').textContent = 'Saving…';
+  try {
+    await updateDoc(doc(db, 'boards', boardId), toSend);
+    $('#board-save-status').textContent = 'Saved';
+  } catch (err) {
+    delete toSend.updatedAt;
+    boardPendingWrites = { ...toSend, ...boardPendingWrites };
+    $('#board-save-status').textContent = 'Save failed — retrying…';
+  }
+}
 
 window.addEventListener('resize', () => {
   if (!$('#view-editor').hidden) applyViewTransform();
