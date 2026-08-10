@@ -723,11 +723,23 @@ function makeNodeEl(id) {
   el.style.background = c.bg;
   el.style.color = c.text;
   el.style.borderColor = c.stroke;
-  el.textContent = n.text;
   el.dataset.id = id;
   const attrTip = attributionTooltip(n);
   if (attrTip) el.title = attrTip;
-  if (id === editingId) el.contentEditable = 'true';
+
+  const label = document.createElement('div');
+  label.className = 'node-label';
+  label.textContent = n.text;
+  if (id === editingId) label.contentEditable = 'true';
+  el.appendChild(label);
+
+  const total = computeNodeTotal(id);
+  if (total !== 0) {
+    const valueEl = document.createElement('div');
+    valueEl.className = 'node-value';
+    valueEl.textContent = formatCurrency(total);
+    el.appendChild(valueEl);
+  }
 
   const kids = childrenOf(id);
   if (kids.length > 0) {
@@ -748,6 +760,27 @@ function makeNodeEl(id) {
   return el;
 }
 
+// ------------------------------------------------------------
+// Budgeting: an optional numeric amount per node. Every node's
+// displayed total is its own amount plus the sum of every descendant's
+// total, computed recursively — so a parent automatically rolls up
+// whatever its children (and their children, etc.) are worth, all the
+// way up to the root showing a grand total.
+// ------------------------------------------------------------
+const CURRENCY_SYMBOL = '$'; // change this one constant for a different currency
+
+function computeNodeTotal(id) {
+  const n = mapData.nodes[id];
+  let sum = typeof n.amount === 'number' ? n.amount : 0;
+  for (const kid of childrenOf(id)) sum += computeNodeTotal(kid);
+  return sum;
+}
+
+function formatCurrency(num) {
+  const sign = num < 0 ? '-' : '';
+  return sign + CURRENCY_SYMBOL + Math.abs(num).toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
 function refreshNodeSelectionClasses() {
   $all('.node', nodeLayer).forEach(el => el.classList.toggle('is-selected', el.dataset.id === selectedId));
   renderNodeActions();
@@ -757,10 +790,11 @@ function refreshNodeSelectionClasses() {
 // Node interactions: select, drag, edit, keyboard
 // ------------------------------------------------------------
 function attachNodeInteractions(el, id) {
+  const label = el.querySelector('.node-label');
   let dragging = false, moved = false, startX, startY, origX, origY;
 
   el.addEventListener('pointerdown', (e) => {
-    if (el.isContentEditable) return;
+    if (label.isContentEditable) return;
     e.stopPropagation();
     el.setPointerCapture(e.pointerId);
     dragging = true; moved = false;
@@ -795,14 +829,14 @@ function attachNodeInteractions(el, id) {
     else { selectNode(id); }
   });
 
-  el.addEventListener('dblclick', (e) => { e.stopPropagation(); startEditing(id); });
-  el.addEventListener('blur', () => { if (editingId === id) commitEditing(el); });
+  label.addEventListener('dblclick', (e) => { e.stopPropagation(); startEditing(id); });
+  label.addEventListener('blur', () => { if (editingId === id) commitEditing(label); });
 
-  el.addEventListener('keydown', (e) => {
+  label.addEventListener('keydown', (e) => {
     if (editingId !== id) return;
     if (e.key === 'Enter') {
       e.preventDefault();
-      commitEditing(el);
+      commitEditing(label);
       const n = mapData.nodes[id];
       if (n.parentId) {
         const newId = addChildNode(n.parentId, '');
@@ -810,12 +844,12 @@ function attachNodeInteractions(el, id) {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      commitEditing(el);
+      commitEditing(label);
       const newId = addChildNode(id, '');
       startEditing(newId);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      el.blur();
+      label.blur();
     }
   });
 }
@@ -846,7 +880,7 @@ function selectNode(id) { selectedId = id; refreshNodeSelectionClasses(); }
 
 function startEditing(id) {
   if (editingId && editingId !== id) {
-    const prevEl = nodeLayer.querySelector(`[data-id="${editingId}"]`);
+    const prevEl = nodeLayer.querySelector(`[data-id="${editingId}"] .node-label`);
     if (prevEl) commitEditing(prevEl);
   }
   editingId = id;
@@ -858,16 +892,16 @@ function startEditing(id) {
   // settled, which made a fresh node silently fail to pick up focus.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      const el = nodeLayer.querySelector(`[data-id="${id}"]`);
+      const el = nodeLayer.querySelector(`[data-id="${id}"] .node-label`);
       if (el) { el.focus(); document.getSelection().selectAllChildren(el); }
     });
   });
 }
 
-function commitEditing(el) {
-  const id = el.dataset.id;
+function commitEditing(labelEl) {
+  const id = labelEl.closest('.node').dataset.id;
   const n = mapData.nodes[id];
-  const text = el.textContent.trim() || 'Untitled';
+  const text = labelEl.textContent.trim() || 'Untitled';
   if (n.text !== text) {
     n.text = text;
     n.updatedBy = currentUser.uid;
@@ -876,7 +910,7 @@ function commitEditing(el) {
     queueNodeWrite(id);
   }
   editingId = null;
-  el.contentEditable = 'false';
+  labelEl.contentEditable = 'false';
   renderNodeActions();
 }
 
@@ -922,6 +956,16 @@ function renderNodeActions() {
   renameBtn.addEventListener('click', (e) => { e.stopPropagation(); startEditing(selectedId); });
   row.appendChild(renameBtn);
 
+  const amountBtn = document.createElement('button');
+  amountBtn.textContent = '💲';
+  amountBtn.title = (n.amount !== undefined && n.amount !== null) ? 'Edit amount' : 'Add amount';
+  amountBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nodeEl = nodeLayer.querySelector(`[data-id="${selectedId}"]`);
+    if (nodeEl) openAmountPicker(selectedId, nodeEl);
+  });
+  row.appendChild(amountBtn);
+
   if (n.depth > 0) {
     const delBtn = document.createElement('button');
     delBtn.textContent = '🗑';
@@ -955,6 +999,72 @@ function renderNodeActions() {
 
   nodeLayer.appendChild(actionsEl);
 }
+
+// ------------------------------------------------------------
+// Amount picker — small inline numeric input popover for setting a
+// node's own budget amount, same visual pattern as the board's
+// due-date picker.
+// ------------------------------------------------------------
+function closeAmountPicker() {
+  const existing = document.getElementById('amount-picker');
+  if (existing) existing.remove();
+}
+function openAmountPicker(nodeId, nodeEl) {
+  closeAmountPicker();
+  const n = mapData.nodes[nodeId];
+  const pop = document.createElement('div');
+  pop.className = 'amount-picker';
+  pop.id = 'amount-picker';
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.step = 'any';
+  input.placeholder = 'Amount';
+  input.value = (n.amount !== undefined && n.amount !== null) ? n.amount : '';
+  pop.appendChild(input);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.className = 'btn btn-primary btn-tiny';
+  saveBtn.addEventListener('click', (e) => { e.stopPropagation(); commitAmount(nodeId, input.value); });
+  pop.appendChild(saveBtn);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = 'Clear';
+  clearBtn.className = 'btn btn-ghost btn-tiny';
+  clearBtn.addEventListener('click', (e) => { e.stopPropagation(); commitAmount(nodeId, ''); });
+  pop.appendChild(clearBtn);
+
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // don't let map-editor global shortcuts (Tab/Delete/etc.) fire while typing here
+    if (e.key === 'Enter') { e.preventDefault(); commitAmount(nodeId, input.value); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeAmountPicker(); }
+  });
+
+  document.body.appendChild(pop);
+  const rect = nodeEl.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+  pop.style.top = (rect.bottom + 8) + 'px';
+  input.focus();
+  input.select();
+}
+function commitAmount(nodeId, rawValue) {
+  const n = mapData.nodes[nodeId];
+  const trimmed = String(rawValue).trim();
+  if (trimmed === '') {
+    delete n.amount;
+  } else {
+    const num = parseFloat(trimmed);
+    if (!isNaN(num)) n.amount = num;
+  }
+  queueNodeWrite(nodeId);
+  closeAmountPicker();
+  renderAll();
+}
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('amount-picker');
+  if (pop && !pop.contains(e.target) && !e.target.closest('.node-actions')) closeAmountPicker();
+});
 
 function handleDeleteSelected() {
   if (!selectedId || selectedId === mapData.rootId) return;
