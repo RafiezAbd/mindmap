@@ -285,6 +285,23 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 .map-card:hover .map-card-del { opacity: 0.85; }
 .map-card-del:hover { opacity: 1; color: var(--danger); background: rgba(255,93,93,0.15); }
 
+.dash-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 44px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.dash-info-card {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--ink-soft);
+}
+.dash-info-card h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--text-hi); font-family: var(--font-display); }
+.dash-info-card p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-lo); }
+
 /* ============ Editor ============ */
 .view-editor { display: flex; flex-direction: column; }
 .ed-topbar {
