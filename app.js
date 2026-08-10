@@ -1585,48 +1585,56 @@ function commitCardEditing(textEl) {
 }
 
 function attachCardDrag(el, cardId) {
-  let dragging = false, moved = false, startX, startY;
-
   el.addEventListener('pointerdown', (e) => {
     if (el.querySelector('.board-card-text').isContentEditable) return;
     if (e.target.closest('.board-card-actions')) return;
+    e.preventDefault();
     e.stopPropagation();
-    el.setPointerCapture(e.pointerId);
-    dragging = true; moved = false;
-    startX = e.clientX; startY = e.clientY;
-  });
 
-  el.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    if (!moved && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
-    if (!moved) {
-      moved = true;
-      boardDraggingCardId = cardId;
-      el.classList.add('is-dragging');
-    }
-    el.style.pointerEvents = 'none';
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    el.style.pointerEvents = '';
-    const colList = under && under.closest('.board-column-cards');
-    if (colList) {
-      const siblings = Array.from(colList.querySelectorAll('.board-card')).filter(c => c !== el);
-      let placed = false;
-      for (const sib of siblings) {
-        const r = sib.getBoundingClientRect();
-        if (e.clientY < r.top + r.height / 2) { colList.insertBefore(el, sib); placed = true; break; }
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+
+    // Deliberately NOT using setPointerCapture here: this drag works by
+    // reparenting `el` into whatever column list is under the cursor as
+    // you move (that's what makes the live reordering feel responsive).
+    // Several browsers silently drop pointer capture the moment the
+    // captured element gets reparented, which would kill the drag after
+    // its very first move — so we track pointermove/pointerup on the
+    // document instead, which has no such issue.
+    function onMove(ev) {
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return;
+      if (!moved) {
+        moved = true;
+        boardDraggingCardId = cardId;
+        el.classList.add('is-dragging');
       }
-      if (!placed) colList.appendChild(el);
+      el.style.pointerEvents = 'none';
+      const under = document.elementFromPoint(ev.clientX, ev.clientY);
+      el.style.pointerEvents = '';
+      const colList = under && under.closest('.board-column-cards');
+      if (colList) {
+        const siblings = Array.from(colList.querySelectorAll('.board-card')).filter(c => c !== el);
+        let placed = false;
+        for (const sib of siblings) {
+          const r = sib.getBoundingClientRect();
+          if (ev.clientY < r.top + r.height / 2) { colList.insertBefore(el, sib); placed = true; break; }
+        }
+        if (!placed) colList.appendChild(el);
+      }
     }
-  });
 
-  el.addEventListener('pointerup', () => {
-    if (!dragging) return;
-    dragging = false;
-    if (moved) {
-      el.classList.remove('is-dragging');
-      boardDraggingCardId = null;
-      commitCardDragResult();
+    function onUp() {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (moved) {
+        el.classList.remove('is-dragging');
+        boardDraggingCardId = null;
+        commitCardDragResult();
+      }
     }
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   });
 }
 
