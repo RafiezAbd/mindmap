@@ -617,7 +617,11 @@ function relayoutChildren(parentId) {
   });
 }
 
-function addChildNode(parentId, text = 'New idea') {
+// Builds a single new node under parentId and queues its write, but does
+// NOT relayout siblings or mark the map dirty — callers that add just one
+// node (addChildNode) or many at once (paste) each decide when to do that,
+// so pasting a whole branch doesn't re-center siblings after every node.
+function createChildNode(parentId, text = 'New idea', extra = {}) {
   const parent = mapData.nodes[parentId];
   const id = uid4();
   let side, branch;
@@ -637,9 +641,15 @@ function addChildNode(parentId, text = 'New idea') {
     collapsed: false, order: siblingCount,
     createdBy: currentUser.uid,
     createdByName: currentUser.displayName || currentUser.email || 'Someone',
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    ...extra
   };
   queueNodeWrite(id);
+  return id;
+}
+
+function addChildNode(parentId, text = 'New idea') {
+  const id = createChildNode(parentId, text);
   relayoutChildren(parentId);
   markMetaDirty();
   return id;
@@ -658,6 +668,51 @@ function collectDescendants(id) {
   let out = [];
   for (const kid of childrenOf(id)) out.push(kid, ...collectDescendants(kid));
   return out;
+}
+
+// ------------------------------------------------------------
+// Copy / paste — the clipboard holds a plain-object snapshot of a
+// node's subtree (text, amount, color, collapsed state, and nested
+// children), stripped of ids/parent/position so it can be pasted
+// anywhere, any number of times, as a fresh set of nodes each time.
+// Session-local only (not synced) — same lifetime as a system clipboard.
+// ------------------------------------------------------------
+let clipboardNode = null;
+
+function cloneSubtreeForClipboard(id) {
+  const n = mapData.nodes[id];
+  const clip = { text: n.text, collapsed: !!n.collapsed };
+  if (n.amount !== undefined && n.amount !== null) clip.amount = n.amount;
+  if (n.hueOverride !== undefined && n.hueOverride !== null) clip.hueOverride = n.hueOverride;
+  clip.children = childrenOf(id).map(cloneSubtreeForClipboard);
+  return clip;
+}
+
+function copySelected() {
+  if (!selectedId || !mapData.nodes[selectedId]) return;
+  clipboardNode = cloneSubtreeForClipboard(selectedId);
+  const count = collectDescendants(selectedId).length;
+  toast(count > 0
+    ? `Copied "${mapData.nodes[selectedId].text}" + ${count} sub-idea${count === 1 ? '' : 's'}`
+    : `Copied "${mapData.nodes[selectedId].text}"`);
+}
+
+function pasteNodeUnder(clip, parentId) {
+  const extra = { collapsed: clip.collapsed };
+  if (clip.amount !== undefined) extra.amount = clip.amount;
+  if (clip.hueOverride !== undefined) extra.hueOverride = clip.hueOverride;
+  const id = createChildNode(parentId, clip.text, extra);
+  clip.children.forEach(childClip => pasteNodeUnder(childClip, id));
+  return id;
+}
+
+function pasteClipboard() {
+  if (!clipboardNode || !selectedId || !mapData.nodes[selectedId]) return;
+  const newId = pasteNodeUnder(clipboardNode, selectedId);
+  relayoutChildren(selectedId);
+  markMetaDirty();
+  selectedId = newId;
+  renderAll();
 }
 
 // ============================================================
@@ -988,6 +1043,20 @@ function renderNodeActions() {
   });
   row.appendChild(amountBtn);
 
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = '⧉';
+  copyBtn.title = 'Copy branch (Ctrl+C)';
+  copyBtn.addEventListener('click', (e) => { e.stopPropagation(); copySelected(); });
+  row.appendChild(copyBtn);
+
+  if (clipboardNode) {
+    const pasteBtn = document.createElement('button');
+    pasteBtn.textContent = '📥';
+    pasteBtn.title = 'Paste as child (Ctrl+V)';
+    pasteBtn.addEventListener('click', (e) => { e.stopPropagation(); pasteClipboard(); });
+    row.appendChild(pasteBtn);
+  }
+
   if (n.depth > 0) {
     const delBtn = document.createElement('button');
     delBtn.textContent = '🗑';
@@ -1217,6 +1286,12 @@ document.addEventListener('keydown', (e) => {
   } else if (e.key === 'Enter' && selectedId) {
     e.preventDefault();
     startEditing(selectedId);
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedId) {
+    e.preventDefault();
+    copySelected();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && selectedId && clipboardNode) {
+    e.preventDefault();
+    pasteClipboard();
   }
 });
 
