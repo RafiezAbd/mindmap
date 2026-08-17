@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>User Guide — Branchwork</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body class="guide-body">
+
+<div class="guide-page">
+  <header class="guide-header">
+    <a href="index.html" class="guide-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 40 40" width="24" height="24">
+          <circle cx="20" cy="20" r="5.5" fill="currentColor"/>
+          <path d="M20 20 C 30 12, 34 10, 34 5" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M20 20 C 30 28, 34 30, 34 35" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path d="M20 20 C 8 14, 5 12, 5 6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="34" cy="5" r="3" fill="currentColor"/>
+          <circle cx="34" cy="35" r="3" fill="currentColor"/>
+          <circle cx="5" cy="6" r="2.4" fill="currentColor"/>
+        </svg>
+      </span>
+      <span class="dash-brand-name">Branchwork <span class="brand-by">by rafiez</span></span>
+    </a>
+    <a href="index.html" class="btn btn-ghost">← Back to app</a>
+  </header>
+
+  <div class="guide-layout">
+    <nav class="guide-toc" aria-label="Table of contents">
+      <span class="guide-toc-label">Contents</span>
+      <a href="#getting-started">Getting started</a>
+      <a href="#mind-maps">Mind maps</a>
+      <a href="#budgeting">Budgeting with mind maps</a>
+      <a href="#boards">Boards</a>
+      <a href="#sharing">Sharing &amp; real-time collaboration</a>
+      <a href="#shortcuts">Keyboard shortcuts</a>
+      <a href="#tips">Tips for working efficiently</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+
+    <main class="guide-content">
+      <h1>Branchwork — User Guide</h1>
+      <p class="guide-lede">
+        Branchwork is a workspace for two kinds of thinking: <strong>mind maps</strong> for
+        getting ideas out of your head, and <strong>boards</strong> for tracking work through
+        stages. This guide covers how to use both efficiently, including every shortcut
+        worth knowing.
+      </p>
+
+      <section id="getting-started">
+        <h2>Getting started</h2>
+        <ol>
+          <li>Open the app and sign in — either <strong>Continue with Google</strong>, or create an account with an email and password.</li>
+          <li>You'll land on your <strong>workspace</strong>: a dashboard listing every map and board you own or have been invited to, newest first.</li>
+          <li>Two buttons create something new: <strong>+ New mind map</strong> and <strong>+ New board</strong>. A third, <strong>Join with a code</strong>, is how you get added to something a collaborator started (see <a href="#sharing">Sharing</a>).</li>
+          <li>Click any card to open it. <strong>← Maps</strong> / <strong>← Boards</strong> in the top-left of the editor takes you back to the workspace at any time — your work is already saved by then, no separate "save" step needed.</li>
+        </ol>
+      </section>
+
+      <section id="mind-maps">
+        <h2>Mind maps</h2>
+        <p>A mind map is a tree: one central idea in the middle, with branches fanning out from it. Every branch gets its own color automatically.</p>
+
+        <h3>Adding and editing ideas</h3>
+        <div class="guide-table-wrap">
+          <table>
+            <thead><tr><th>Action</th><th>How</th></tr></thead>
+            <tbody>
+              <tr><td>Add a child idea</td><td>Select a node, press <kbd>Tab</kbd>, or click <strong>+</strong> in its toolbar</td></tr>
+              <tr><td>Add a sibling idea</td><td>While renaming a node, press <kbd>Enter</kbd></td></tr>
+              <tr><td>Rename a node</td><td><strong>Double-click</strong> it, or click <strong>✎</strong> in its toolbar</td></tr>
+              <tr><td>Finish renaming</td><td>Press <kbd>Enter</kbd>, or click anywhere else</td></tr>
+              <tr><td>Delete a node (+ everything under it)</td><td>Select it and press <kbd>Delete</kbd>/<kbd>Backspace</kbd>, or click 🗑 — you'll be asked to confirm if it has children</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>New nodes drop straight into rename mode — just start typing.</p>
+
+        <h3>Moving things around</h3>
+        <ul>
+          <li><strong>Drag a node</strong> to reposition it. Its entire branch (every node underneath it) moves along with it, keeping the whole subtree intact.</li>
+          <li><strong>Drag empty canvas</strong> to pan around a large map.</li>
+          <li><strong>Scroll</strong> to zoom, or use the <strong>−</strong> / <strong>+</strong> / reset buttons top-right. On trackpads, pinch to zoom works too.</li>
+          <li>Click the small circle on a node with children to <strong>collapse</strong> that branch out of view (click again to expand). Handy for focusing on one part of a large map.</li>
+        </ul>
+
+        <h3>Copy and paste a branch</h3>
+        <p>Select any node and:</p>
+        <ul>
+          <li><strong>Ctrl+C</strong> (or the ⧉ button) copies it and everything underneath it.</li>
+          <li>Select a different node and press <strong>Ctrl+V</strong> (or 📥) to paste the copied branch in as a new child there — as many times as you like, each paste is an independent copy.</li>
+        </ul>
+        <p>This is the fastest way to reuse a repeated structure (e.g. the same set of sub-steps under several different branches) without rebuilding it by hand each time.</p>
+
+        <h3>Color</h3>
+        <ul>
+          <li>Each branch off the center gets its own color automatically, chosen so two people adding branches at the same moment never collide.</li>
+          <li>Nodes get lighter the deeper they are in a branch, so you can tell at a glance how deep something sits.</li>
+          <li>Any node can become its own color anchor: select it and click its color swatch to give it (and everything under it) a fresh color. Click again to reshuffle, or <strong>right-click</strong> the swatch to reset it back to its inherited color.</li>
+        </ul>
+
+        <h3>Seeing who did what</h3>
+        <p>Hover any node to see who added it, and who last edited its text (if different), with a relative timestamp — useful on a shared map to see what's changed and who's driving.</p>
+      </section>
+
+      <section id="budgeting">
+        <h2>Budgeting with mind maps</h2>
+        <p>Mind maps double as a simple budgeting tool: give any node a dollar amount, and every parent above it automatically shows the total of everything underneath it — all the way up to the center.</p>
+        <ol>
+          <li>Select a node and click <strong>💲</strong> in its toolbar.</li>
+          <li>Type a number and <strong>Save</strong>. That's now this node's own value.</li>
+          <li>Every node with a nonzero total (its own value, or the sum of its children's) shows that total as a small line underneath its label — automatically, with no extra step.</li>
+          <li>To remove a value from a node, open its 💲 popover again and click <strong>Clear</strong>.</li>
+        </ol>
+        <p>A node can have both its own value <em>and</em> children with their own values — its total is the sum of both. This means a category can have a flat "misc" amount alongside itemized sub-branches, and everything still rolls up correctly.</p>
+        <p class="guide-callout"><strong>Example:</strong> a "Household" branch with children "Rent" ($1,200), "Groceries" ($400), and "Utilities" ($150) will show <strong>$1,750</strong> on the Household node itself, with no manual addition required.</p>
+      </section>
+
+      <section id="boards">
+        <h2>Boards</h2>
+        <p>A board is a Kanban-style set of columns (e.g. To Do / In Progress / Done) containing cards you drag between them as work progresses.</p>
+
+        <h3>Columns</h3>
+        <div class="guide-table-wrap">
+          <table>
+            <thead><tr><th>Action</th><th>How</th></tr></thead>
+            <tbody>
+              <tr><td>Add a column</td><td>Click <strong>+ Add column</strong> at the end of the row</td></tr>
+              <tr><td>Rename a column</td><td>Click its title and type</td></tr>
+              <tr><td>Reorder columns</td><td>Use the <strong>←</strong> / <strong>→</strong> arrows in a column's header</td></tr>
+              <tr><td>Delete a column</td><td>Click <strong>✕</strong> in its header — asks first if it has cards</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Cards</h3>
+        <div class="guide-table-wrap">
+          <table>
+            <thead><tr><th>Action</th><th>How</th></tr></thead>
+            <tbody>
+              <tr><td>Add a card</td><td>Click <strong>+ Add card</strong> at the bottom of a column</td></tr>
+              <tr><td>Rename a card</td><td><strong>Double-click</strong> it and type</td></tr>
+              <tr><td>Move a card</td><td><strong>Drag</strong> it — within a column to reorder, or into another column to move it there</td></tr>
+              <tr><td>Delete a card</td><td>Click 🗑 on the card</td></tr>
+              <tr><td>Set a due date</td><td>Click 📅 on the card, pick a date. Overdue dates show in red. Click <strong>Clear</strong> to remove it</td></tr>
+              <tr><td>Label a card with a color</td><td>Click 🎨 to cycle through preset colors (or back to none)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>A card left blank when you click away is automatically discarded rather than left sitting empty on the board.</p>
+        <p>Hover a card to see who added or last edited it, same as mind map nodes.</p>
+      </section>
+
+      <section id="sharing">
+        <h2>Sharing &amp; real-time collaboration</h2>
+        <p>Both maps and boards can be shared with anyone else who has an account — edits sync between everyone within a fraction of a second, with no refresh needed.</p>
+
+        <h3>Inviting someone</h3>
+        <ol>
+          <li>Open the map or board (you must be the <strong>owner</strong>).</li>
+          <li>Click <strong>Share</strong> in the top bar.</li>
+          <li>You'll see a 6-character invite code. Either:
+            <ul>
+              <li>Click <strong>Copy</strong> to grab just the code, or</li>
+              <li>Click <strong>✉ Copy invite message</strong> for a ready-to-send message with a link and the code included.</li>
+            </ul>
+          </li>
+          <li>Send it to your collaborator however you like — chat, email, etc.</li>
+        </ol>
+
+        <h3>Joining someone else's map or board</h3>
+        <ol>
+          <li>From your workspace, click <strong>Join with a code</strong>.</li>
+          <li>Paste in the code you were sent and click <strong>Join</strong>.</li>
+          <li>It's added to your workspace immediately, and you're taken straight into it.</li>
+        </ol>
+
+        <h3>Managing collaborators</h3>
+        <ul>
+          <li>The <strong>Share</strong> panel lists everyone currently on the map/board, with a <strong>Remove</strong> button next to each (owner only).</li>
+          <li><strong>↻ New code</strong> retires the current invite code and issues a new one — useful if you want to stop new people from joining without removing anyone already in.</li>
+          <li>If you're a collaborator (not the owner) and want to leave, do it from your workspace: hover the item's card and click the eject icon.</li>
+        </ul>
+      </section>
+
+      <section id="shortcuts">
+        <h2>Keyboard shortcuts at a glance</h2>
+        <h3>Mind maps</h3>
+        <div class="guide-table-wrap">
+          <table>
+            <thead><tr><th>Shortcut</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr><td><kbd>Tab</kbd></td><td>Add a child idea to the selected node</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>Rename the selected node, or (while renaming) add a sibling</td></tr>
+              <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Delete the selected node and its branch</td></tr>
+              <tr><td><kbd>Ctrl+C</kbd></td><td>Copy the selected node's branch</td></tr>
+              <tr><td><kbd>Ctrl+V</kbd></td><td>Paste the copied branch as a child of the selected node</td></tr>
+              <tr><td><kbd>Escape</kbd></td><td>Stop renaming without extra changes</td></tr>
+              <tr><td>Double-click a node</td><td>Rename it</td></tr>
+              <tr><td>Scroll / pinch</td><td>Zoom</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="guide-note">(On Mac, <kbd>Ctrl+C</kbd>/<kbd>Ctrl+V</kbd> also work as written — no need to substitute <kbd>Cmd</kbd>.)</p>
+        <p><strong>Boards</strong> are drag-and-click driven rather than keyboard-driven — every action has a visible button or icon on the card/column itself.</p>
+      </section>
+
+      <section id="tips">
+        <h2>Tips for working efficiently</h2>
+        <ul>
+          <li><strong>Build fast with Tab and Enter</strong>: select a node, hit <kbd>Tab</kbd> to add a child and start typing immediately, then <kbd>Enter</kbd> to add the next sibling without touching the mouse. You can rough out an entire branch this way before ever needing to drag anything into position.</li>
+          <li><strong>Use copy/paste for repeated structure.</strong> If several branches share the same shape (e.g. every "Project" branch needs "Goals / Tasks / Notes" underneath it), build it once and paste it wherever you need it instead of retyping.</li>
+          <li><strong>Collapse what you're not working on.</strong> On a large map, collapsing finished or reference-only branches keeps you focused and makes dragging/panning noticeably less cluttered.</li>
+          <li><strong>Color your branches meaningfully</strong>, not just decoratively — e.g. one color per project, or per person, or per priority level. Since color cascades down a branch automatically, you only have to set it once at the top of that branch.</li>
+          <li><strong>Use amounts even outside of literal money.</strong> The budgeting rollup works for any number you want summed up a tree — time estimates, points, quantities — not just currency.</li>
+          <li><strong>On a shared map or board, check attribution before asking "who did this?"</strong> — hovering the node or card usually answers it faster than asking in chat.</li>
+          <li><strong>Regenerate your invite code</strong> once everyone you want has joined, so the link/code you shared earlier stops working — a quick habit that keeps a "who can edit this" list clean over time.</li>
+        </ul>
+      </section>
+
+      <section id="faq">
+        <h2>Frequently asked questions</h2>
+
+        <p class="guide-q">Can I use a map and a board for the same project?</p>
+        <p>Yes — they're independent, so a common pattern is a mind map for planning/structure and a board for execution/tracking, both shared with the same collaborators.</p>
+
+        <p class="guide-q">Is there an undo button?</p>
+        <p>Not currently — deleting a branch or card asks for confirmation first specifically because of this, so double-check before confirming a delete.</p>
+
+        <p class="guide-q">Can I export my data?</p>
+        <p>Yes — <strong>Export</strong> in the top bar of either editor downloads the current map or board as a <code>.json</code> file.</p>
+
+        <p class="guide-q">Does someone need an account to view my map?</p>
+        <p>Yes — everyone who accesses a map or board, owner or collaborator, signs in first. There's no public/anonymous view link.</p>
+
+        <p class="guide-q">What happens if two people edit the same node or card at the same time?</p>
+        <p>Both edits sync — the app is built to merge concurrent changes rather than have one person's edit silently overwrite another's.</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>
