@@ -109,6 +109,11 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 .auth-brand { display: flex; align-items: center; gap: 10px; color: var(--accent); }
 .auth-brand h1 { font-size: 22px; color: var(--text-hi); font-weight: 700; }
 .brand-mark { color: var(--accent); display: inline-flex; }
+.brand-by {
+  font-family: var(--font-body); font-weight: 500; color: var(--accent);
+  letter-spacing: 0; text-transform: none;
+}
+.auth-brand h1 .brand-by { font-size: 13px; }
 .auth-tagline { color: var(--text-lo); font-size: 13.5px; margin: 10px 0 22px; }
 .auth-tabs {
   display: flex;
@@ -239,6 +244,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 }
 .dash-brand { display: flex; align-items: center; gap: 8px; color: var(--accent); }
 .dash-brand-name { color: var(--text-hi); font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.dash-brand-name .brand-by { font-size: 11px; }
 .dash-version {
   color: var(--text-lo);
   font-size: 11px;
