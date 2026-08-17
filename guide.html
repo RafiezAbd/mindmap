@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>User Guide — Branchwork</title>
 <link rel="icon" href="data:," />
+<script>
+  (function () {
+    var t = localStorage.getItem('bw-theme') === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -28,7 +34,10 @@
       </span>
       <span class="dash-brand-name">Branchwork <span class="brand-by">by rafiez</span></span>
     </a>
-    <a href="index.html" class="btn btn-ghost">← Back to app</a>
+    <div class="guide-header-actions">
+      <button id="theme-toggle" class="btn btn-icon theme-toggle" title="Toggle light / dark mode">🌙</button>
+      <a href="index.html" class="btn btn-ghost">← Back to app</a>
+    </div>
   </header>
 
   <div class="guide-layout">
@@ -246,5 +255,22 @@
   </div>
 </div>
 
+<script>
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    function sync() {
+      var t = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      btn.textContent = t === 'light' ? '🌙' : '☀️';
+      btn.title = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    }
+    sync();
+    btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      localStorage.setItem('bw-theme', next);
+      document.documentElement.setAttribute('data-theme', next);
+      sync();
+    });
+  })();
+</script>
 </body>
 </html>

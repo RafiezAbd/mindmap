@@ -33,6 +33,26 @@ function showView(name) {
   });
 }
 
+// ------------------------------------------------------------
+// Theme (light / dark)
+// ------------------------------------------------------------
+const THEME_KEY = 'bw-theme';
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  $all('.theme-toggle').forEach(btn => {
+    btn.textContent = theme === 'light' ? '🌙' : '☀️';
+    btn.title = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+  });
+}
+applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark');
+$all('.theme-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  });
+});
+
 let toastTimer = null;
 function toast(msg) {
   const el = $('#toast');

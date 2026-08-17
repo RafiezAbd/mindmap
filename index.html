@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
 <title>Branchwork — Mind Mapping</title>
 <link rel="icon" href="data:," />
+<script>
+  (function () {
+    var t = localStorage.getItem('bw-theme') === 'light' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,6 +21,7 @@
   <!-- ===================== AUTH VIEW ===================== -->
   <section id="view-auth" class="view view-auth">
     <div class="auth-card">
+      <button class="btn btn-icon theme-toggle auth-theme-toggle" title="Toggle light / dark mode">🌙</button>
       <div class="auth-brand">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 40 40" width="30" height="30">
@@ -72,10 +79,11 @@
             <circle cx="34" cy="35" r="3" fill="currentColor"/>
           </svg>
         </span>
-        <span class="dash-brand-name">Branchwork <span class="brand-by">by rafiez</span></span>
+        <span class="dash-brand-name">Branchwork <span class="brand-by">by Rafiez</span></span>
         <span class="dash-version">v2.3</span>
       </div>
       <div class="dash-user">
+        <button class="btn btn-icon theme-toggle" title="Toggle light / dark mode">🌙</button>
         <a href="guide.html" target="_blank" rel="noopener" class="btn btn-ghost" title="How to use Branchwork">Guide</a>
         <span id="dash-email" class="dash-email"></span>
         <button id="btn-logout" class="btn btn-ghost">Log out</button>
@@ -126,6 +134,7 @@
       <button id="btn-share" class="btn btn-ghost" title="Invite a collaborator">Share</button>
       <button id="btn-export" class="btn btn-ghost" title="Export this map as JSON">Export</button>
       <a href="guide.html" target="_blank" rel="noopener" class="btn btn-ghost" title="How to use Branchwork">Guide</a>
+      <button class="btn btn-icon theme-toggle" title="Toggle light / dark mode">🌙</button>
     </header>
 
     <div id="canvas-wrap" class="canvas-wrap">
@@ -154,6 +163,7 @@
       <button id="btn-board-share" class="btn btn-ghost" title="Invite a collaborator">Share</button>
       <button id="btn-board-export" class="btn btn-ghost" title="Export this board as JSON">Export</button>
       <a href="guide.html" target="_blank" rel="noopener" class="btn btn-ghost" title="How to use Branchwork">Guide</a>
+      <button class="btn btn-icon theme-toggle" title="Toggle light / dark mode">🌙</button>
     </header>
 
     <div class="board-body">
