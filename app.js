@@ -406,6 +406,7 @@ let mapData = null;         // { title, ownerId, collaborators, rootId, nodes: {
 let selectedId = null;
 let editingId = null;
 let draggingId = null;
+const draggingSubtreeIds = new Set(); // node + all descendants currently being dragged together
 let unsubscribeMap = null;
 
 // Board editor state — kept separate from the map editor's above
@@ -533,7 +534,7 @@ function mergeRemoteIntoLocal(remote) {
 
   for (const id of remoteIds) {
     if (pendingWrites[`nodes.${id}`] !== undefined) continue; // we have an unsynced local edit — ours wins for now
-    if (id === editingId || id === draggingId) continue;      // actively being touched locally
+    if (id === editingId || draggingSubtreeIds.has(id)) continue; // actively being touched locally
     const incoming = remoteNodes[id];
     const local = mapData.nodes[id];
     if (!local || !nodesEqual(local, incoming)) {
@@ -791,7 +792,11 @@ function refreshNodeSelectionClasses() {
 // ------------------------------------------------------------
 function attachNodeInteractions(el, id) {
   const label = el.querySelector('.node-label');
-  let dragging = false, moved = false, startX, startY, origX, origY;
+  let dragging = false, moved = false, startX, startY;
+  // The dragged node's whole subtree moves with it — origins and DOM
+  // elements for every descendant are snapshotted once at drag start
+  // rather than re-queried on every pointermove.
+  let subtreeIds = [], origPositions = null, subtreeEls = null;
 
   el.addEventListener('pointerdown', (e) => {
     if (label.isContentEditable) return;
@@ -799,8 +804,17 @@ function attachNodeInteractions(el, id) {
     el.setPointerCapture(e.pointerId);
     dragging = true; moved = false;
     startX = e.clientX; startY = e.clientY;
-    const n = mapData.nodes[id];
-    origX = n.x; origY = n.y;
+
+    subtreeIds = [id, ...collectDescendants(id)];
+    origPositions = new Map();
+    subtreeEls = new Map();
+    for (const nid of subtreeIds) {
+      const n = mapData.nodes[nid];
+      origPositions.set(nid, { x: n.x, y: n.y });
+      const nodeEl = nid === id ? el : nodeLayer.querySelector(`[data-id="${nid}"]`);
+      if (nodeEl) subtreeEls.set(nid, nodeEl);
+      draggingSubtreeIds.add(nid);
+    }
     draggingId = id;
   });
 
@@ -810,23 +824,31 @@ function attachNodeInteractions(el, id) {
     const dy = (e.clientY - startY) / view.scale;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
     if (!moved) return;
-    const n = mapData.nodes[id];
-    n.x = origX + dx;
-    n.y = origY + dy;
-    n.manual = true;
+    for (const nid of subtreeIds) {
+      const n = mapData.nodes[nid];
+      const orig = origPositions.get(nid);
+      n.x = orig.x + dx;
+      n.y = orig.y + dy;
+      n.manual = true;
+      const nodeEl = subtreeEls.get(nid);
+      if (nodeEl) {
+        nodeEl.style.left = n.x + 'px';
+        nodeEl.style.top = n.y + 'px';
+      }
+    }
     el.classList.add('is-dragging');
-    el.style.left = n.x + 'px';
-    el.style.top = n.y + 'px';
-    updateEdgesForDrag(id);
+    updateEdgesForDrag(subtreeIds);
   });
 
   el.addEventListener('pointerup', () => {
     if (!dragging) return;
     dragging = false;
-    draggingId = null;
     el.classList.remove('is-dragging');
-    if (moved) { queueNodeWrite(id); }
+    if (moved) { subtreeIds.forEach(queueNodeWrite); }
     else { selectNode(id); }
+    subtreeIds.forEach(nid => draggingSubtreeIds.delete(nid));
+    draggingId = null;
+    subtreeIds = []; origPositions = null; subtreeEls = null;
   });
 
   label.addEventListener('dblclick', (e) => { e.stopPropagation(); startEditing(id); });
@@ -854,20 +876,20 @@ function attachNodeInteractions(el, id) {
   });
 }
 
-function updateEdgesForDrag(id) {
-  // Only the edge into this node, and the edges out to each of its
-  // children, actually move when this node is dragged — touch just those
-  // instead of tearing down and rebuilding every edge in the map on
-  // every single pointermove (that full rebuild was the main cause of
-  // dragging feeling sluggish on anything but tiny maps).
-  const n = mapData.nodes[id];
-  if (n.parentId && mapData.nodes[n.parentId]) {
-    const ownEdge = edgeLayer.querySelector(`[data-child="${id}"]`);
-    if (ownEdge) ownEdge.setAttribute('d', edgeD(mapData.nodes[n.parentId], n));
-  }
-  childrenOf(id).forEach(kidId => {
-    const kidEdge = edgeLayer.querySelector(`[data-child="${kidId}"]`);
-    if (kidEdge) kidEdge.setAttribute('d', edgeD(n, mapData.nodes[kidId]));
+function updateEdgesForDrag(ids) {
+  // Only the "own" edge (parent -> node) for each node in the dragged
+  // subtree actually needs redrawing — since every descendant moved by
+  // the same delta, that single edge per node covers both the entry
+  // edge into the dragged node (from its stationary parent) and every
+  // edge inside the subtree. Touching just those instead of tearing
+  // down and rebuilding every edge in the map is what keeps dragging
+  // smooth on anything but tiny maps.
+  ids.forEach(id => {
+    const n = mapData.nodes[id];
+    if (n.parentId && mapData.nodes[n.parentId]) {
+      const ownEdge = edgeLayer.querySelector(`[data-child="${id}"]`);
+      if (ownEdge) ownEdge.setAttribute('d', edgeD(mapData.nodes[n.parentId], n));
+    }
   });
 }
 
