@@ -446,6 +446,23 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   color: var(--text-hi); border-radius: 6px; padding: 5px 7px; font-size: 12.5px;
 }
 
+.note-picker {
+  position: fixed;
+  display: flex; flex-direction: column; gap: 8px;
+  width: 240px;
+  background: var(--ink-soft); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); padding: 10px;
+  box-shadow: var(--shadow-card); z-index: 250;
+}
+.note-picker-caption { font-size: 10.5px; color: var(--text-lo); }
+.note-picker textarea {
+  width: 100%; min-height: 84px; resize: vertical;
+  background: rgba(var(--overlay-rgb),0.06); border: 1px solid var(--line);
+  color: var(--text-hi); border-radius: 6px; padding: 7px 8px; font-size: 12.5px;
+  font-family: inherit; line-height: 1.4;
+}
+.note-picker-actions { display: flex; justify-content: flex-end; gap: 6px; }
+
 .node-toggle {
   position: absolute;
   right: -8px; bottom: -8px;
@@ -459,6 +476,19 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   cursor: pointer;
 }
 .node-toggle:hover { border-color: #fff; }
+
+.node-note-badge {
+  position: absolute;
+  left: -8px; bottom: -8px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  border: 1.5px solid var(--line);
+  font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.node-note-badge:hover { border-color: #fff; }
 
 .node-actions {
   position: absolute;

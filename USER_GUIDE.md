@@ -89,6 +89,20 @@ hand each time.
   Click again to reshuffle, or **right-click** the swatch to reset it
   back to its inherited color.
 
+### Notes
+
+Any node can carry one free-text note — a place for context, a comment,
+or a question that doesn't belong in the node's short label.
+
+- Select a node and click **📝** in its toolbar to add or edit its note.
+  **Save** keeps it, **Delete** removes it.
+- A node with a note shows a small 📝 badge on its corner — click the
+  badge directly to open it without going through the toolbar.
+- Notes are shared like everything else on the map: any collaborator can
+  add, edit, or delete a note on any node, and changes sync live.
+- Hovering a node includes its note (if any) alongside the usual
+  attribution, so you can preview it without opening the popover.
+
 ### Seeing who did what
 
 Hover any node to see who added it, and who last edited its text (if

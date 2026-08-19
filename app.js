@@ -293,11 +293,14 @@ function relativeTime(date) {
 
 // Full multi-line text for a node's native hover tooltip.
 function attributionTooltip(n) {
-  if (!n.createdBy) return '';
-  let lines = [`Added by ${n.createdByName || 'someone'} · ${relativeTime(new Date(n.createdAt))}`];
-  if (n.updatedBy && n.updatedAt && n.updatedAt !== n.createdAt) {
-    lines.push(`Edited by ${n.updatedByName || 'someone'} · ${relativeTime(new Date(n.updatedAt))}`);
+  let lines = [];
+  if (n.createdBy) {
+    lines.push(`Added by ${n.createdByName || 'someone'} · ${relativeTime(new Date(n.createdAt))}`);
+    if (n.updatedBy && n.updatedAt && n.updatedAt !== n.createdAt) {
+      lines.push(`Edited by ${n.updatedByName || 'someone'} · ${relativeTime(new Date(n.updatedAt))}`);
+    }
   }
+  if (n.note) lines.push(`Note: ${n.note}`);
   return lines.join('\n');
 }
 
@@ -704,6 +707,7 @@ function cloneSubtreeForClipboard(id) {
   const clip = { text: n.text, collapsed: !!n.collapsed };
   if (n.amount !== undefined && n.amount !== null) clip.amount = n.amount;
   if (n.hueOverride !== undefined && n.hueOverride !== null) clip.hueOverride = n.hueOverride;
+  if (n.note) clip.note = n.note;
   clip.children = childrenOf(id).map(cloneSubtreeForClipboard);
   return clip;
 }
@@ -721,6 +725,12 @@ function pasteNodeUnder(clip, parentId) {
   const extra = { collapsed: clip.collapsed };
   if (clip.amount !== undefined) extra.amount = clip.amount;
   if (clip.hueOverride !== undefined) extra.hueOverride = clip.hueOverride;
+  if (clip.note !== undefined) {
+    extra.note = clip.note;
+    extra.noteUpdatedBy = currentUser.uid;
+    extra.noteUpdatedByName = currentUser.displayName || currentUser.email || 'Someone';
+    extra.noteUpdatedAt = Date.now();
+  }
   const id = createChildNode(parentId, clip.text, extra);
   clip.children.forEach(childClip => pasteNodeUnder(childClip, id));
   return id;
@@ -830,6 +840,20 @@ function makeNodeEl(id) {
       renderAll();
     });
     el.appendChild(toggle);
+  }
+
+  if (n.note) {
+    const badge = document.createElement('div');
+    badge.className = 'node-note-badge';
+    badge.textContent = '📝';
+    badge.title = 'Has a note — click to view';
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedId = id;
+      refreshNodeSelectionClasses();
+      openNotePicker(id, el);
+    });
+    el.appendChild(badge);
   }
 
   attachNodeInteractions(el, id);
@@ -1063,6 +1087,16 @@ function renderNodeActions() {
   });
   row.appendChild(amountBtn);
 
+  const noteBtn = document.createElement('button');
+  noteBtn.textContent = '📝';
+  noteBtn.title = n.note ? 'Edit note' : 'Add note';
+  noteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const nodeEl = nodeLayer.querySelector(`[data-id="${selectedId}"]`);
+    if (nodeEl) openNotePicker(selectedId, nodeEl);
+  });
+  row.appendChild(noteBtn);
+
   const copyBtn = document.createElement('button');
   copyBtn.textContent = '⧉';
   copyBtn.title = 'Copy branch (Ctrl+C)';
@@ -1175,6 +1209,88 @@ function commitAmount(nodeId, rawValue) {
 document.addEventListener('click', (e) => {
   const pop = document.getElementById('amount-picker');
   if (pop && !pop.contains(e.target) && !e.target.closest('.node-actions')) closeAmountPicker();
+});
+
+// ------------------------------------------------------------
+// Note picker — a free-text comment any collaborator can add, edit,
+// or delete on any node, same visual pattern as the amount picker.
+// Synced as an ordinary node field, so it's shared and live like
+// everything else on the map — no separate permission model.
+// ------------------------------------------------------------
+function closeNotePicker() {
+  const existing = document.getElementById('note-picker');
+  if (existing) existing.remove();
+}
+function openNotePicker(nodeId, nodeEl) {
+  closeNotePicker();
+  closeAmountPicker();
+  const n = mapData.nodes[nodeId];
+  const pop = document.createElement('div');
+  pop.className = 'note-picker';
+  pop.id = 'note-picker';
+
+  if (n.noteUpdatedBy && n.noteUpdatedAt) {
+    const caption = document.createElement('div');
+    caption.className = 'note-picker-caption';
+    caption.textContent = `Note by ${n.noteUpdatedByName || 'someone'} · ${relativeTime(new Date(n.noteUpdatedAt))}`;
+    pop.appendChild(caption);
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = 'Add a note…';
+  textarea.value = n.note || '';
+  pop.appendChild(textarea);
+
+  const actions = document.createElement('div');
+  actions.className = 'note-picker-actions';
+  pop.appendChild(actions);
+
+  const clearBtn = document.createElement('button');
+  clearBtn.textContent = 'Delete';
+  clearBtn.className = 'btn btn-ghost btn-tiny';
+  clearBtn.addEventListener('click', (e) => { e.stopPropagation(); commitNote(nodeId, ''); });
+  actions.appendChild(clearBtn);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save';
+  saveBtn.className = 'btn btn-primary btn-tiny';
+  saveBtn.addEventListener('click', (e) => { e.stopPropagation(); commitNote(nodeId, textarea.value); });
+  actions.appendChild(saveBtn);
+
+  textarea.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // don't let map-editor global shortcuts (Tab/Delete/etc.) fire while typing here
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commitNote(nodeId, textarea.value); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeNotePicker(); }
+  });
+
+  document.body.appendChild(pop);
+  const rect = nodeEl.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left, window.innerWidth - 260) + 'px';
+  pop.style.top = (rect.bottom + 8) + 'px';
+  textarea.focus();
+}
+function commitNote(nodeId, rawValue) {
+  const n = mapData.nodes[nodeId];
+  const trimmed = String(rawValue).trim();
+  const changed = trimmed !== (n.note || '');
+  if (trimmed === '') {
+    delete n.note;
+    delete n.noteUpdatedBy;
+    delete n.noteUpdatedByName;
+    delete n.noteUpdatedAt;
+  } else if (changed) {
+    n.note = trimmed;
+    n.noteUpdatedBy = currentUser.uid;
+    n.noteUpdatedByName = currentUser.displayName || currentUser.email || 'Someone';
+    n.noteUpdatedAt = Date.now();
+  }
+  queueNodeWrite(nodeId);
+  closeNotePicker();
+  renderAll();
+}
+document.addEventListener('click', (e) => {
+  const pop = document.getElementById('note-picker');
+  if (pop && !pop.contains(e.target) && !e.target.closest('.node-actions') && !e.target.closest('.node-note-badge')) closeNotePicker();
 });
 
 function handleDeleteSelected() {
