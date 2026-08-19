@@ -899,6 +899,10 @@ function attachNodeInteractions(el, id) {
 
   el.addEventListener('pointerdown', (e) => {
     if (label.isContentEditable) return;
+    // Small satellite controls (collapse toggle, note badge) handle their
+    // own clicks — bail before we capture the pointer, or the browser
+    // retargets their click event to this node instead of the control.
+    if (e.target.closest('.node-toggle, .node-note-badge')) return;
     e.stopPropagation();
     el.setPointerCapture(e.pointerId);
     dragging = true; moved = false;
