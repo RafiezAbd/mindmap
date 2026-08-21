@@ -131,6 +131,7 @@
         <button id="btn-zoom-in" class="btn btn-icon" title="Zoom in">+</button>
         <button id="btn-zoom-reset" class="btn btn-icon" title="Reset view">⤢</button>
       </div>
+      <button id="btn-notes" class="btn btn-ghost" title="Jump to a note">📝 Notes</button>
       <button id="btn-share" class="btn btn-ghost" title="Invite a collaborator">Share</button>
       <button id="btn-export" class="btn btn-ghost" title="Export this map as JSON">Export</button>
       <a href="guide.html" target="_blank" rel="noopener" class="btn btn-ghost" title="How to use Branchwork">Guide</a>
@@ -185,6 +186,14 @@
         </div>
       </form>
     </div>
+  </div>
+
+  <!-- ===================== NOTES PANEL ===================== -->
+  <div id="notes-panel" class="notes-panel" hidden>
+    <div class="notes-panel-row">
+      <span class="share-panel-label">Notes on this map</span>
+    </div>
+    <div id="notes-list" class="notes-panel-list"></div>
   </div>
 
   <!-- ===================== SHARE PANEL ===================== -->

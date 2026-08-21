@@ -360,6 +360,7 @@ $('#btn-back').addEventListener('click', () => {
   stopAutosaveLoop();
   stopMapListener();
   $('#share-panel').hidden = true;
+  $('#notes-panel').hidden = true;
   showView('dashboard');
   loadDashboard();
 });
@@ -368,6 +369,7 @@ $('#btn-board-back').addEventListener('click', () => {
   stopBoardAutosaveLoop();
   stopBoardListener();
   $('#share-panel').hidden = true;
+  $('#notes-panel').hidden = true;
   showView('dashboard');
   loadDashboard();
 });
@@ -469,6 +471,7 @@ async function openMap(id) {
 
   $('#map-title-input').value = mapData.title || 'Untitled map';
   $('#share-panel').hidden = true;
+  $('#notes-panel').hidden = true;
   updateShareButtonVisibility();
   showView('editor');
   centerView();
@@ -785,6 +788,7 @@ function renderAll() {
   ids.forEach(id => nodeLayer.appendChild(makeNodeEl(id)));
   applyViewTransform();
   renderNodeActions();
+  renderNotesPanel();
 }
 
 function makeEdgePath(p, n, childId) {
@@ -1297,6 +1301,98 @@ document.addEventListener('click', (e) => {
   if (pop && !pop.contains(e.target) && !e.target.closest('.node-actions') && !e.target.closest('.node-note-badge')) closeNotePicker();
 });
 
+// ------------------------------------------------------------
+// Notes panel — a live index of every note on the map, so a
+// collaborator doesn't have to hunt the canvas for the 📝 badges.
+// Clicking an entry pans/selects that node, expanding any collapsed
+// ancestor that's currently hiding it.
+// ------------------------------------------------------------
+function collectNotes() {
+  return Object.entries(mapData.nodes)
+    .filter(([, n]) => n.note)
+    .map(([id, n]) => ({ id, n }))
+    .sort((a, b) => (b.n.noteUpdatedAt || 0) - (a.n.noteUpdatedAt || 0));
+}
+
+function renderNotesPanel() {
+  const notes = collectNotes();
+  const btn = $('#btn-notes');
+  if (btn) btn.textContent = notes.length ? `📝 Notes (${notes.length})` : '📝 Notes';
+
+  const panel = $('#notes-panel');
+  if (panel.hidden) return;
+  const list = $('#notes-list');
+  if (notes.length === 0) {
+    list.innerHTML = '<p class="share-owner-note">No notes yet — click the 📝 on any node to add one.</p>';
+    return;
+  }
+  list.innerHTML = '';
+  notes.forEach(({ id, n }) => {
+    const item = document.createElement('div');
+    item.className = 'notes-panel-item';
+    const nodeName = document.createElement('div');
+    nodeName.className = 'notes-panel-item-node';
+    nodeName.textContent = n.text;
+    const noteText = document.createElement('div');
+    noteText.className = 'notes-panel-item-note';
+    noteText.textContent = n.note;
+    const meta = document.createElement('div');
+    meta.className = 'notes-panel-item-meta';
+    meta.textContent = `${n.noteUpdatedByName || 'Someone'} · ${n.noteUpdatedAt ? relativeTime(new Date(n.noteUpdatedAt)) : 'just now'}`;
+    item.append(nodeName, noteText, meta);
+    item.addEventListener('click', () => {
+      $('#notes-panel').hidden = true;
+      focusNode(id);
+    });
+    list.appendChild(item);
+  });
+}
+
+function openNotesPanel() {
+  const panel = $('#notes-panel');
+  if (!panel.hidden) { panel.hidden = true; return; }
+  $('#share-panel').hidden = true;
+  panel.hidden = false;
+  renderNotesPanel();
+}
+$('#btn-notes').addEventListener('click', (e) => { e.stopPropagation(); openNotesPanel(); });
+document.addEventListener('click', (e) => {
+  const panel = $('#notes-panel');
+  if (!panel.hidden && !panel.contains(e.target) && !e.target.closest('#btn-notes')) panel.hidden = true;
+});
+
+// Pans the canvas to center the given node, expanding any collapsed
+// ancestor that's hiding it, and briefly pulses it so it's easy to spot.
+function focusNode(id) {
+  const n = mapData.nodes[id];
+  if (!n) return;
+  let expanded = false;
+  let pid = n.parentId;
+  while (pid) {
+    const p = mapData.nodes[pid];
+    if (p.collapsed) { p.collapsed = false; queueNodeWrite(pid); expanded = true; }
+    pid = p.parentId;
+  }
+  if (expanded) renderAll();
+
+  selectedId = id;
+  refreshNodeSelectionClasses();
+
+  const rect = canvasWrap.getBoundingClientRect();
+  view.scale = Math.max(view.scale, 1);
+  view.panX = rect.width / 2 - n.x * view.scale;
+  view.panY = rect.height / 2 - n.y * view.scale;
+  applyViewTransform();
+
+  const el = nodeLayer.querySelector(`[data-id="${id}"]`);
+  if (el) {
+    el.classList.remove('is-pulse');
+    void el.offsetWidth; // restart the animation if it's already mid-pulse
+    el.classList.add('is-pulse');
+    setTimeout(() => el.classList.remove('is-pulse'), 1700);
+  }
+}
+
 function handleDeleteSelected() {
   if (!selectedId || selectedId === mapData.rootId) return;
   const n = mapData.nodes[selectedId];
@@ -1451,6 +1547,7 @@ function openSharePanel() {
   if (!isOwner()) { toast(`Only the ${activeKind === 'board' ? 'board' : 'map'} owner can manage sharing.`); return; }
   const panel = $('#share-panel');
   if (!panel.hidden) { panel.hidden = true; return; }
+  $('#notes-panel').hidden = true;
   (async () => {
     if (!activeData().shareCode) await regenerateShareCode(/*silent=*/true);
     renderSharePanel();
@@ -1641,6 +1738,7 @@ async function openBoard(id) {
 
   $('#board-title-input').value = boardData.title || 'Untitled board';
   $('#share-panel').hidden = true;
+  $('#notes-panel').hidden = true;
   updateShareButtonVisibility();
   showView('board');
   renderBoard();
