@@ -102,6 +102,11 @@ or a question that doesn't belong in the node's short label.
   add, edit, or delete a note on any node, and changes sync live.
 - Hovering a node includes its note (if any) alongside the usual
   attribution, so you can preview it without opening the popover.
+- Click **📝 Notes** in the top bar to see every note on the map in one
+  list, newest first — handy on a large map where a note's badge might
+  be off-screen. Click any entry to jump straight to that node: the
+  view pans and centers on it, expanding any collapsed branch in the
+  way, and briefly highlights it.
 
 ### Seeing who did what
 
