@@ -15,6 +15,7 @@ import {
   getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, deleteField,
   getDocs, getDoc, onSnapshot, query, where, serverTimestamp, arrayUnion, arrayRemove
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import * as htmlToImage from "https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/+esm";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -1704,6 +1705,72 @@ function exportActiveItem() {
 }
 $('#btn-export').addEventListener('click', exportActiveItem);
 $('#btn-board-export').addEventListener('click', exportActiveItem);
+
+// ------------------------------------------------------------
+// PNG export — rasterizes every currently-expanded node (collapsed
+// branches are excluded, same set renderAll() draws) into a single
+// image, regardless of what's currently scrolled/zoomed into view.
+// Renders worldEl itself rather than the visible canvas-wrap, so the
+// captured area isn't limited by the viewport or clipped by its
+// overflow:hidden — only the pan/zoom transform needs to be swapped
+// out for one that fits the full node bounding box, which html-to-image
+// does on a clone, leaving the live view untouched.
+// ------------------------------------------------------------
+function visibleNodeBoundingBox() {
+  const ids = visibleNodeIds();
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  ids.forEach(id => {
+    const n = mapData.nodes[id];
+    const el = nodeLayer.querySelector(`[data-id="${id}"]`);
+    const w = el ? el.offsetWidth : 120;
+    const h = el ? el.offsetHeight : 44;
+    minX = Math.min(minX, n.x - w / 2);
+    maxX = Math.max(maxX, n.x + w / 2);
+    minY = Math.min(minY, n.y - h / 2);
+    maxY = Math.max(maxY, n.y + h / 2);
+  });
+  if (minX === Infinity) return { minX: -100, minY: -40, maxX: 100, maxY: 40 };
+  return { minX, minY, maxX, maxY };
+}
+
+async function exportMapAsPng() {
+  if (!mapData) return;
+  const btn = $('#btn-export-png');
+  const original = btn.textContent;
+  btn.textContent = 'Rendering…';
+  btn.disabled = true;
+  try {
+    const PAD = 48;
+    const { minX, minY, maxX, maxY } = visibleNodeBoundingBox();
+    const width = Math.ceil(maxX - minX + PAD * 2);
+    const height = Math.ceil(maxY - minY + PAD * 2);
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim() || '#ffffff';
+    const blob = await htmlToImage.toBlob(worldEl, {
+      width, height,
+      pixelRatio: 2,
+      backgroundColor: bg,
+      filter: (node) => !(node.classList && node.classList.contains('node-actions')),
+      style: {
+        transform: `translate(${-minX + PAD}px, ${-minY + PAD}px) scale(1)`,
+        transformOrigin: '0 0'
+      }
+    });
+    if (!blob) throw new Error('Nothing to render');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(mapData.title || 'mind-map').replace(/[^a-z0-9-_]+/gi, '_')}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Map exported as PNG');
+  } catch (err) {
+    toast("Couldn't export PNG — try again");
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+$('#btn-export-png').addEventListener('click', exportMapAsPng);
 
 // ============================================================
 // BOARD EDITOR (Kanban)
