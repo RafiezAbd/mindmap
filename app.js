@@ -798,6 +798,12 @@ function makeEdgePath(p, n, childId) {
   ns.setAttribute('class', 'edge-path');
   if (childId) ns.dataset.child = childId;
   const color = colorForNode(n);
+  // fill:none also lives in the .edge-path CSS rule, but set it as an
+  // attribute too — the PNG export's DOM-to-image step doesn't reliably
+  // carry class-based styles onto cloned SVG elements, and a path's
+  // default (black) fill paints the wedge between an open bezier curve
+  // and its implicit closing line back to the start point.
+  ns.setAttribute('fill', 'none');
   ns.setAttribute('stroke', color.bg);
   ns.setAttribute('stroke-width', Math.max(2, 6 - (n.depth - 1) * 1.1));
   ns.setAttribute('opacity', '0.85');
